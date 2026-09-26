@@ -28,6 +28,15 @@ const leadershipSchema = z.object({
   orderIndex: z.number().int().optional(),
 });
 
+const officialDirectorySchema = z.object({
+  matricNumber: z.string().min(3),
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+  graduatingSetId: z.string().min(1),
+  facultyId: z.string().min(1),
+  department: z.string().min(1),
+});
+
 // GET /api/admin/stats (Dashboard aggregate stats)
 router.get("/stats", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "EXCO_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -261,6 +270,78 @@ router.get("/payments", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "FI
     return res.json(payments);
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch payments" });
+  }
+});
+
+// GET /api/admin/official-directory (View pre-loaded official directory roster)
+router.get("/official-directory", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "EXCO_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const search = (req.query.search as string) || "";
+    const whereClause: any = {};
+    if (search) {
+      whereClause.OR = [
+        { matricNumber: { contains: search, mode: "insensitive" } },
+        { firstName: { contains: search, mode: "insensitive" } },
+        { lastName: { contains: search, mode: "insensitive" } },
+        { department: { contains: search, mode: "insensitive" } },
+      ];
+    }
+    const entries = await prisma.officialAlumniDirectory.findMany({
+      where: whereClause,
+      include: {
+        graduatingSet: true,
+        faculty: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return res.json(entries);
+  } catch (err) {
+    console.error("Fetch official directory error:", err);
+    return res.status(500).json({ error: "Failed to fetch official alumni directory entries" });
+  }
+});
+
+// POST /api/admin/official-directory (Add entry to official directory roster)
+router.post("/official-directory", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN"), validateBody(officialDirectorySchema), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { matricNumber, firstName, lastName, graduatingSetId, facultyId, department } = req.body;
+    const existing = await prisma.officialAlumniDirectory.findUnique({
+      where: { matricNumber: matricNumber.trim().toUpperCase() },
+    });
+    if (existing) {
+      return res.status(400).json({ error: "Matriculation number already exists in official directory." });
+    }
+
+    const entry = await prisma.officialAlumniDirectory.create({
+      data: {
+        matricNumber: matricNumber.trim().toUpperCase(),
+        firstName,
+        lastName,
+        graduatingSetId,
+        facultyId,
+        department,
+      },
+      include: {
+        graduatingSet: true,
+        faculty: true,
+      },
+    });
+
+    return res.status(201).json(entry);
+  } catch (err) {
+    console.error("Create official directory entry error:", err);
+    return res.status(500).json({ error: "Failed to add entry to official alumni directory" });
+  }
+});
+
+// DELETE /api/admin/official-directory/:id
+router.delete("/official-directory/:id", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    await prisma.officialAlumniDirectory.delete({ where: { id } });
+    return res.json({ message: "Official directory entry removed" });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to delete official directory entry" });
   }
 });
 
