@@ -32,59 +32,68 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
       const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_test_sample";
       const PaystackPop = (window as any).PaystackPop;
 
-      if (PaystackPop) {
-        const handleSuccess = async (response: any) => {
-          await apiFetch("/api/finance/pay-dues", {
-            method: "POST",
-            body: JSON.stringify({ duesItemId: payingItem.id }),
-          });
-          alert("Payment successful! Reference: " + (response.reference || response.trxref || "SUCCESS"));
-          setPayingItem(null);
-          const [duesRes, histRes] = await Promise.all([
-            apiFetch("/api/finance/dues").catch(() => []),
-            apiFetch("/api/finance/history").catch(() => []),
-          ]);
-          setDuesList(Array.isArray(duesRes) ? duesRes : duesRes.data || []);
-          setPaymentHistory(Array.isArray(histRes) ? histRes : histRes.data || []);
-        };
-
-        const handleClose = () => {
-          alert("Payment window closed.");
-        };
-
-        const popConfig = {
-          key: paystackKey,
-          email: "member@cliffordalumni.ng",
-          amount: Number(payingItem.amount) * 100, // amount in kobo
-          currency: "NGN",
-          ref: "DUES-" + Math.floor(Math.random() * 1000000000 + 1),
-          callback: handleSuccess,
-          onSuccess: handleSuccess,
-          onClose: handleClose,
-          onCancel: handleClose,
-        };
-
-        if (typeof PaystackPop.setup === "function") {
-          const handler = PaystackPop.setup(popConfig);
-          handler.openIframe();
-        } else {
-          const paystack = new PaystackPop();
-          paystack.newTransaction(popConfig);
-        }
-      } else {
-        // Fallback to direct backend API call if inline JS script is blocked
-        await apiFetch("/api/finance/pay-dues", {
-          method: "POST",
-          body: JSON.stringify({ duesItemId: payingItem.id }),
-        });
-        alert("Payment processed successfully!");
-        setPayingItem(null);
+      const refreshData = async () => {
         const [duesRes, histRes] = await Promise.all([
           apiFetch("/api/finance/dues").catch(() => []),
           apiFetch("/api/finance/history").catch(() => []),
         ]);
         setDuesList(Array.isArray(duesRes) ? duesRes : duesRes.data || []);
         setPaymentHistory(Array.isArray(histRes) ? histRes : histRes.data || []);
+      };
+
+      const recordPayment = async (response?: any) => {
+        await apiFetch("/api/finance/pay-dues", {
+          method: "POST",
+          body: JSON.stringify({ duesItemId: payingItem.id }),
+        });
+        alert("Payment successful! Reference: " + (response?.reference || response?.trxref || "SUCCESS"));
+        setPayingItem(null);
+        await refreshData();
+      };
+
+      if (PaystackPop) {
+        // IMPORTANT: Paystack's v1 inline.js validates callback/onClose with
+        // Object.prototype.toString.call(fn) === "[object Function]". An
+        // `async` function fails that check (it reports as [object AsyncFunction])
+        // and throws "Attribute callback must be a valid function". So these
+        // handlers passed to Paystack must be plain, non-async functions —
+        // any async work happens inside a call to an async helper instead.
+        const handleSuccess = function (response: any) {
+          recordPayment(response);
+        };
+
+        const handleClose = function () {
+          alert("Payment window closed.");
+        };
+
+        const baseConfig = {
+          key: paystackKey,
+          email: "member@cliffordalumni.ng",
+          amount: Number(payingItem.amount) * 100, // amount in kobo
+          currency: "NGN",
+          ref: "DUES-" + Math.floor(Math.random() * 1000000000 + 1),
+        };
+
+        if (typeof PaystackPop.setup === "function") {
+          // Popup V1 API — uses callback / onClose (both must be plain functions)
+          const handler = PaystackPop.setup({
+            ...baseConfig,
+            callback: handleSuccess,
+            onClose: handleClose,
+          });
+          handler.openIframe();
+        } else {
+          // Popup V2 API — uses onSuccess / onCancel (no "callback" key)
+          const paystack = new PaystackPop();
+          paystack.newTransaction({
+            ...baseConfig,
+            onSuccess: handleSuccess,
+            onCancel: handleClose,
+          });
+        }
+      } else {
+        // Fallback to direct backend API call if inline JS script is blocked
+        await recordPayment();
       }
     } catch (err: any) {
       alert(err.message || "Payment failed");
