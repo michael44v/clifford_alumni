@@ -48,6 +48,15 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
   const outstandingDues = duesList.filter(d => d.status !== "PAID");
   const totalOutstanding = outstandingDues.reduce((s, i) => s + (i.amount || 0), 0);
 
+  const currentYear = new Date().getFullYear();
+  const duesPaidCurrentYear = paymentHistory
+    .filter(p => (p.status === "SUCCESSFUL" || p.status === "PAID") && new Date(p.createdAt).getFullYear() === currentYear)
+    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+  const totalPaidAllTime = paymentHistory
+    .filter(p => p.status === "SUCCESSFUL" || p.status === "PAID")
+    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
   return (
     <div className="bg-[var(--background)]">
       <div className="bg-[var(--secondary)] py-14 px-4 sm:px-6 text-white text-center">
@@ -73,8 +82,8 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           {[
             { label: "Outstanding Balance", value: `₦${totalOutstanding.toLocaleString()}`, color: totalOutstanding > 0 ? "text-red-600" : "text-green-600" },
-            { label: "Dues Paid (2024)", value: "₦5,000", color: "text-green-600" },
-            { label: "Total Paid (All Time)", value: "₦23,000", color: "text-[var(--primary)]" },
+            { label: `Dues Paid (${currentYear})`, value: `₦${duesPaidCurrentYear.toLocaleString()}`, color: "text-green-600" },
+            { label: "Total Paid (All Time)", value: `₦${totalPaidAllTime.toLocaleString()}`, color: "text-[var(--primary)]" },
             { label: "Payment Status", value: totalOutstanding > 0 ? "Action Needed" : "Up to Date", color: totalOutstanding > 0 ? "text-amber-600" : "text-green-600" },
           ].map(({ label, value, color }) => (
             <div key={label} className="bg-white border border-[var(--border)] rounded-xl p-4 text-center">
