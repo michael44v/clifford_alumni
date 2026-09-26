@@ -101,4 +101,15 @@ router.post("/", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "CONTENT_A
   }
 });
 
+// DELETE /api/news/:id (Admin Delete)
+router.delete("/:id", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "CONTENT_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    await prisma.newsAnnouncement.delete({ where: { id } });
+    return res.json({ message: "Announcement deleted successfully" });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to delete announcement" });
+  }
+});
+
 export default router;
