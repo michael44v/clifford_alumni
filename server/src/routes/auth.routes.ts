@@ -38,6 +38,29 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+// POST /api/auth/verify-matric
+router.post("/verify-matric", async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { matricNumber } = req.body;
+    if (!matricNumber) {
+      return res.status(400).json({ error: "Matriculation number is required." });
+    }
+    const officialEntry = await prisma.officialAlumniDirectory.findUnique({
+      where: { matricNumber: String(matricNumber).trim().toUpperCase() },
+      include: { graduatingSet: true, faculty: true },
+    });
+    if (!officialEntry) {
+      return res.status(404).json({
+        valid: false,
+        error: "Matriculation number not found in the official alumni directory. Please check your matric number or apply for Associate Membership.",
+      });
+    }
+    return res.json({ valid: true, entry: officialEntry });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to verify matriculation number." });
+  }
+});
+
 // POST /api/auth/register/alumni
 router.post(
   "/register/alumni",

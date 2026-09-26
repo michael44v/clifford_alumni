@@ -28,19 +28,10 @@ export const CLU_FACULTIES = [
   "OTHERS",
 ];
 
-export const NIGERIAN_LOCATIONS = [
-  "FCT (Abuja)", "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa",
-  "Benue", "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu",
-  "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi",
-  "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo",
-  "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara", "Diaspora",
-];
-
 export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
   const [search, setSearch] = useState("");
   const [faculty, setFaculty] = useState("All Faculties");
   const [gradSet, setGradSet] = useState("All Sets");
-  const [location, setLocation] = useState("All Locations");
   const [alumni, setAlumni] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedAlum, setSelectedAlum] = useState<any | null>(null);
@@ -48,13 +39,12 @@ export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
   useEffect(() => {
     if (!isLoggedIn) return;
     setLoading(true);
-    let url = `/api/members/directory?search=${encodeURIComponent(search)}`;
-    if (location !== "All Locations") url += `&state=${encodeURIComponent(location)}`;
+    const url = `/api/members/directory?search=${encodeURIComponent(search)}`;
     apiFetch(url)
       .then(res => setAlumni(res.data || []))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
-  }, [isLoggedIn, search, location]);
+  }, [isLoggedIn, search]);
 
   const filtered = alumni.filter(a => {
     const facultyName = a.faculty?.name || "";
@@ -100,7 +90,7 @@ export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
             />
             <button className="px-6 py-2.5 bg-[var(--primary)] text-white rounded-lg text-sm font-semibold hover:bg-[var(--accent)] transition-colors">Search</button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <select value={faculty} onChange={e => setFaculty(e.target.value)} className="px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
               <option>All Faculties</option>
               {CLU_FACULTIES.map(f => <option key={f}>{f}</option>)}
@@ -108,10 +98,6 @@ export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
             <select value={gradSet} onChange={e => setGradSet(e.target.value)} className="px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
               <option>All Sets</option>
               {GRADUATION_SETS.map(s => <option key={s.set} value={s.set}>{s.set} ({s.year})</option>)}
-            </select>
-            <select value={location} onChange={e => setLocation(e.target.value)} className="px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
-              <option>All Locations</option>
-              {NIGERIAN_LOCATIONS.map(l => <option key={l}>{l}</option>)}
             </select>
           </div>
         </div>

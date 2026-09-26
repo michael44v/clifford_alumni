@@ -109,12 +109,37 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
     }
   };
 
-  const verifyMatric = () => {
+  const [verifyingMatric, setVerifyingMatric] = useState(false);
+
+  const verifyMatric = async () => {
     const trimmed = matricNumber.trim().toUpperCase();
     setMatricError("");
     if (!trimmed) { setMatricError("Please enter your matriculation number."); return; }
-    setMatricVerified(true);
-    setRegStep("details");
+
+    setVerifyingMatric(true);
+    try {
+      const res = await apiFetch("/api/auth/verify-matric", {
+        method: "POST",
+        body: JSON.stringify({ matricNumber: trimmed }),
+      });
+      if (res.valid) {
+        setMatricVerified(true);
+        if (res.entry) {
+          setRegForm(f => ({
+            ...f,
+            fullName: f.fullName || `${res.entry.firstName || ''} ${res.entry.lastName || ''}`.trim(),
+            dept: f.dept || res.entry.department || '',
+          }));
+        }
+        setRegStep("details");
+      } else {
+        setMatricError(res.error || "Invalid matriculation number.");
+      }
+    } catch (err: any) {
+      setMatricError(err.message || "Matriculation number not found in the official alumni directory.");
+    } finally {
+      setVerifyingMatric(false);
+    }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -311,8 +336,8 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
                     <button onClick={() => { setRegStep("type"); setMatricError(""); }} className="px-4 py-2.5 border border-[var(--border)] rounded-lg text-sm font-medium hover:border-[var(--primary)] transition-colors">
                       ← Back
                     </button>
-                    <button onClick={verifyMatric} className="flex-1 py-2.5 bg-[var(--primary)] text-white font-semibold rounded-lg text-sm hover:bg-[var(--accent)] transition-colors">
-                      Verify Matriculation Number
+                    <button onClick={verifyMatric} disabled={verifyingMatric} className="flex-1 py-2.5 bg-[var(--primary)] text-white font-semibold rounded-lg text-sm hover:bg-[var(--accent)] transition-colors disabled:opacity-50">
+                      {verifyingMatric ? "Verifying..." : "Verify Matriculation Number"}
                     </button>
                   </div>
                 </>

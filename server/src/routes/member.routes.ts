@@ -21,6 +21,28 @@ const updateProfileSchema = z.object({
   privacySettings: z.record(z.boolean()).optional(),
 });
 
+// GET /api/members/alumni-of-the-week (Public)
+router.get("/alumni-of-the-week", async (req, res) => {
+  try {
+    const member = await prisma.member.findFirst({
+      where: { isAlumniOfWeek: true, deletedAt: null },
+      include: {
+        graduatingSet: true,
+        faculty: true,
+        location: true,
+        profilePhoto: true,
+      },
+    });
+    if (!member) {
+      return res.json(null);
+    }
+    const { passwordHash, ...safeMember } = member;
+    return res.json(safeMember);
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to fetch alumni of the week" });
+  }
+});
+
 // GET /api/members/me
 router.get("/me", authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
   try {
