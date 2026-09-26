@@ -4,7 +4,7 @@ import { apiFetch } from "../lib/api";
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface AdminDashboardProps { onNavigate: (page: Page) => void; onLogout: () => void; }
 
-type AdminTab = "overview" | "roster" | "members" | "welfare" | "payments" | "content" | "settings";
+type AdminTab = "overview" | "roster" | "members" | "welfare" | "payments" | "donations" | "content" | "settings";
 
 export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
@@ -18,14 +18,14 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [events, setEvents] = useState<any[]>([]);
   const [news, setNews] = useState<any[]>([]);
   const [leadership, setLeadership] = useState<any[]>([]);
+  const [duesItems, setDuesItems] = useState<any[]>([]);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Search/Filters
   const [memberSearch, setMemberSearch] = useState("");
   const [memberFilterStatus, setMemberFilterStatus] = useState("");
   const [rosterSearch, setRosterSearch] = useState("");
-
-  const [duesItems, setDuesItems] = useState<any[]>([]);
 
   // Modals state
   const [showEventModal, setShowEventModal] = useState(false);
@@ -35,6 +35,9 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [showRosterModal, setShowRosterModal] = useState(false);
   const [showWelfareModal, setShowWelfareModal] = useState<any | null>(null);
   const [showDuesModal, setShowDuesModal] = useState(false);
+  const [showCampaignModal, setShowCampaignModal] = useState(false);
+  const [editingCampaign, setEditingCampaign] = useState<any | null>(null);
+  const [selectedEventAttendees, setSelectedEventAttendees] = useState<any | null>(null);
 
   // Forms
   const [eventForm, setEventForm] = useState({ title: "", description: "", date: "", time: "", venue: "", category: "General", organizer: "CUAA" });
@@ -43,11 +46,12 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [aotwBio, setAotwBio] = useState("");
   const [rosterForm, setRosterForm] = useState({ matricNumber: "", firstName: "", lastName: "", facultyId: "", graduatingSetId: "", department: "" });
   const [duesForm, setDuesForm] = useState({ title: "", amount: "", type: "ANNUAL_DUES", academicYear: "2024/2025", description: "" });
+  const [campaignForm, setCampaignForm] = useState({ title: "", description: "", targetAmount: "" });
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [statsRes, membersRes, rosterRes, welfareRes, paymentsRes, facultiesRes, setsRes, eventsRes, newsRes, leadershipRes, duesRes] = await Promise.all([
+      const [statsRes, membersRes, rosterRes, welfareRes, paymentsRes, facultiesRes, setsRes, eventsRes, newsRes, leadershipRes, duesRes, campaignsRes] = await Promise.all([
         apiFetch("/api/admin/stats").catch(() => null),
         apiFetch(`/api/admin/members?search=${encodeURIComponent(memberSearch)}&status=${memberFilterStatus}`).catch(() => []),
         apiFetch(`/api/admin/official-directory?search=${encodeURIComponent(rosterSearch)}`).catch(() => []),
@@ -59,6 +63,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         apiFetch("/api/news?limit=50").catch(() => []),
         apiFetch("/api/admin/leadership").catch(() => []),
         apiFetch("/api/finance/dues").catch(() => []),
+        apiFetch("/api/finance/campaigns?all=true").catch(() => []),
       ]);
 
       if (statsRes) setAdminStats(statsRes);
@@ -72,6 +77,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setNews(Array.isArray(newsRes) ? newsRes : newsRes?.data || []);
       setLeadership(Array.isArray(leadershipRes) ? leadershipRes : []);
       setDuesItems(Array.isArray(duesRes) ? duesRes : duesRes?.data || []);
+      setCampaigns(Array.isArray(campaignsRes) ? campaignsRes : []);
     } catch (err) {
       console.error("Admin fetchData error:", err);
     } finally {
@@ -288,6 +294,49 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     }
   };
 
+  const handleSaveCampaign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingCampaign) {
+        await apiFetch(`/api/finance/campaigns/${editingCampaign.id}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            title: campaignForm.title,
+            description: campaignForm.description,
+            targetAmount: Number(campaignForm.targetAmount),
+          }),
+        });
+        alert("Donation cause updated!");
+      } else {
+        await apiFetch("/api/finance/campaigns", {
+          method: "POST",
+          body: JSON.stringify({
+            title: campaignForm.title,
+            description: campaignForm.description,
+            targetAmount: Number(campaignForm.targetAmount),
+          }),
+        });
+        alert("Donation cause created!");
+      }
+      setShowCampaignModal(false);
+      setEditingCampaign(null);
+      setCampaignForm({ title: "", description: "", targetAmount: "" });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to save donation cause");
+    }
+  };
+
+  const handleDeleteCampaign = async (id: string) => {
+    if (!confirm("Delete this donation cause?")) return;
+    try {
+      await apiFetch(`/api/finance/campaigns/${id}`, { method: "DELETE" });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to delete donation cause");
+    }
+  };
+
   const stats = [
     { label: "Total Alumni", value: adminStats?.totalMembers || members.length || "0", color: "text-[var(--secondary)]" },
     { label: "Verified Members", value: adminStats?.verifiedMembers || members.filter(m => m.verificationStatus === "VERIFIED").length || "0", color: "text-green-600" },
@@ -319,7 +368,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {/* Navigation Tabs */}
         <div className="flex overflow-x-auto gap-1 bg-white border border-[var(--border)] p-1 rounded mb-6">
-          {(["overview", "roster", "members", "welfare", "payments", "content", "settings"] as AdminTab[]).map(tab => (
+          {(["overview", "roster", "members", "welfare", "payments", "donations", "content", "settings"] as AdminTab[]).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-shrink-0 px-4 py-2 rounded text-xs font-medium capitalize whitespace-nowrap transition-colors ${activeTab === tab ? "bg-[var(--secondary)] text-white" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}>
               {tab === "roster" ? "Official Roster" : tab} {tab === "members" && pendingMembers.length > 0 ? `(${pendingMembers.length})` : ""}
             </button>
@@ -377,6 +426,11 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                     <strong>Add Official Matric</strong>
                     <p className="text-[10px] text-[var(--muted-foreground)]">Add to Official Alumni Directory</p>
                   </button>
+                  <button onClick={() => { setEditingCampaign(null); setCampaignForm({ title: "", description: "", targetAmount: "" }); setShowCampaignModal(true); }} className="p-3 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] text-left">
+                    <span className="text-lg block mb-1">❤️</span>
+                    <strong>Add Donation Cause</strong>
+                    <p className="text-[10px] text-[var(--muted-foreground)]">Create new fundraising campaign</p>
+                  </button>
                   <button onClick={() => setShowNewsModal(true)} className="p-3 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] text-left">
                     <span className="text-lg block mb-1">📣</span>
                     <strong>Post Announcement</strong>
@@ -386,11 +440,6 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                     <span className="text-lg block mb-1">📅</span>
                     <strong>Create Event</strong>
                     <p className="text-[10px] text-[var(--muted-foreground)]">Schedule upcoming event</p>
-                  </button>
-                  <button onClick={() => setShowLeadershipModal(true)} className="p-3 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] text-left">
-                    <span className="text-lg block mb-1">🏛️</span>
-                    <strong>Add EXCO Leader</strong>
-                    <p className="text-[10px] text-[var(--muted-foreground)]">Update governing body</p>
                   </button>
                 </div>
               </div>
@@ -657,6 +706,64 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
           </div>
         )}
 
+        {/* Donations Tab */}
+        {activeTab === "donations" && (
+          <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
+            <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-sm text-[var(--foreground)]">Donation Causes & Campaigns</h3>
+                <p className="text-xs text-[var(--muted-foreground)]">Manage causes, goals, descriptions, and view live raised totals.</p>
+              </div>
+              <button onClick={() => { setEditingCampaign(null); setCampaignForm({ title: "", description: "", targetAmount: "" }); setShowCampaignModal(true); }} className="px-3 py-1.5 bg-[var(--primary)] text-white rounded text-xs font-semibold hover:bg-[var(--accent)]">
+                + Create Donation Cause
+              </button>
+            </div>
+
+            <div className="divide-y divide-[var(--border)]">
+              {campaigns.map((c) => {
+                const raised = Number(c.raisedAmount || 0);
+                const target = Number(c.targetAmount || 1);
+                const pct = Math.min(100, Math.round((raised / target) * 100));
+                return (
+                  <div key={c.id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+                    <div className="flex-1">
+                      <h4 className="font-bold text-base text-[var(--foreground)]">{c.title}</h4>
+                      <p className="text-[var(--muted-foreground)] mt-0.5 leading-relaxed">{c.description}</p>
+                      <div className="mt-2 w-full max-w-md h-2 bg-[var(--muted)] rounded-full overflow-hidden">
+                        <div className="h-full bg-[var(--primary)] rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
+                      <p className="text-[11px] font-semibold text-[var(--primary)] mt-1">
+                        ₦{raised.toLocaleString()} raised ({pct}%) of ₦{target.toLocaleString()} goal
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingCampaign(c);
+                          setCampaignForm({ title: c.title, description: c.description, targetAmount: String(c.targetAmount) });
+                          setShowCampaignModal(true);
+                        }}
+                        className="px-3 py-1.5 border border-[var(--border)] rounded text-xs font-semibold hover:border-[var(--primary)]"
+                      >
+                        Edit Cause
+                      </button>
+                      <button onClick={() => handleDeleteCampaign(c.id)} className="px-3 py-1.5 bg-red-100 text-red-700 rounded text-xs font-semibold hover:bg-red-200">
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {campaigns.length === 0 && (
+                <div className="p-8 text-center text-xs text-[var(--muted-foreground)]">
+                  No donation campaigns created yet. Click "+ Create Donation Cause" above.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Content Tab */}
         {activeTab === "content" && (
           <div className="space-y-8">
@@ -686,16 +793,25 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                 <button onClick={() => setShowEventModal(true)} className="px-3 py-1 bg-[var(--primary)] text-white rounded text-xs font-semibold">+ New Event</button>
               </div>
               <div className="divide-y divide-[var(--border)]">
-                {events.map((e) => (
-                  <div key={e.id} className="p-4 flex items-center justify-between gap-4 text-xs">
-                    <div>
-                      <p className="font-semibold text-sm text-[var(--foreground)]">{e.title}</p>
-                      <p className="text-[var(--muted-foreground)]">📅 {new Date(e.eventDate).toLocaleDateString()} at {e.time || '10:00 AM'} · 📍 {e.venue}</p>
-                      <p className="text-[var(--muted-foreground)] mt-0.5 line-clamp-1">{e.description}</p>
+                {events.map((e) => {
+                  const regList = e.registrations || [];
+                  return (
+                    <div key={e.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+                      <div className="flex-1">
+                        <p className="font-semibold text-sm text-[var(--foreground)]">{e.title}</p>
+                        <p className="text-[var(--muted-foreground)]">📅 {new Date(e.eventDate).toLocaleDateString()} at {e.time || '10:00 AM'} · 📍 {e.venue}</p>
+                        <p className="text-[var(--muted-foreground)] mt-0.5 line-clamp-1">{e.description}</p>
+                        <div className="mt-2 flex items-center gap-2">
+                          <span className="font-semibold text-[var(--primary)]">{regList.length} Registered Attendees</span>
+                          {regList.length > 0 && (
+                            <button onClick={() => setSelectedEventAttendees(e)} className="text-[10px] text-[var(--primary)] underline font-medium">View Attendees List →</button>
+                          )}
+                        </div>
+                      </div>
+                      <button onClick={() => handleDeleteEvent(e.id)} className="px-3 py-1 bg-red-100 text-red-700 rounded font-semibold hover:bg-red-200">Delete</button>
                     </div>
-                    <button onClick={() => handleDeleteEvent(e.id)} className="px-3 py-1 bg-red-100 text-red-700 rounded font-semibold hover:bg-red-200">Delete</button>
-                  </div>
-                ))}
+                  );
+                })}
                 {events.length === 0 && <p className="p-5 text-center text-xs text-[var(--muted-foreground)]">No events created yet.</p>}
               </div>
             </div>
@@ -754,6 +870,61 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
           </div>
         )}
       </div>
+
+      {/* Event Attendees Modal */}
+      {selectedEventAttendees && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelectedEventAttendees(null)}>
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-start border-b border-[var(--border)] pb-3">
+              <div>
+                <h3 className="font-bold text-lg text-[var(--secondary)]">Registered Attendees</h3>
+                <p className="text-xs text-[var(--muted-foreground)]">{selectedEventAttendees.title}</p>
+              </div>
+              <button onClick={() => setSelectedEventAttendees(null)} className="text-gray-400 hover:text-gray-600 font-bold">✕</button>
+            </div>
+            <div className="divide-y divide-[var(--border)] max-h-60 overflow-y-auto">
+              {(selectedEventAttendees.registrations || []).map((r: any, i: number) => (
+                <div key={r.id || i} className="py-2.5 text-xs">
+                  <p className="font-semibold text-[var(--foreground)]">{r.member?.firstName} {r.member?.lastName}</p>
+                  <p className="text-[var(--muted-foreground)]">{r.member?.email} · {r.member?.phone || 'No phone'}</p>
+                </div>
+              ))}
+              {(selectedEventAttendees.registrations || []).length === 0 && (
+                <p className="py-4 text-center text-xs text-[var(--muted-foreground)]">No members registered yet.</p>
+              )}
+            </div>
+            <button onClick={() => setSelectedEventAttendees(null)} className="w-full py-2 bg-[var(--primary)] text-white rounded text-xs font-semibold">Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* Create/Edit Campaign Modal */}
+      {showCampaignModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="font-bold text-lg mb-2">{editingCampaign ? "Edit Donation Cause" : "Create Donation Cause"}</h3>
+            <p className="text-xs text-[var(--muted-foreground)] mb-4">Set title, description and target fundraising goal.</p>
+            <form onSubmit={handleSaveCampaign} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-medium mb-1">Cause / Campaign Title *</label>
+                <input required type="text" placeholder="e.g. Welfare Fund, Alumni Scholarship" value={campaignForm.title} onChange={e => setCampaignForm({...campaignForm, title: e.target.value})} className="w-full p-2 border rounded" />
+              </div>
+              <div>
+                <label className="block font-medium mb-1">Target Fundraising Goal (₦) *</label>
+                <input required type="number" min="1000" placeholder="5000000" value={campaignForm.targetAmount} onChange={e => setCampaignForm({...campaignForm, targetAmount: e.target.value})} className="w-full p-2 border rounded font-bold" />
+              </div>
+              <div>
+                <label className="block font-medium mb-1">Description *</label>
+                <textarea required rows={3} placeholder="Describe the cause purpose..." value={campaignForm.description} onChange={e => setCampaignForm({...campaignForm, description: e.target.value})} className="w-full p-2 border rounded" />
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <button type="button" onClick={() => setShowCampaignModal(false)} className="px-4 py-2 border rounded font-medium">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-[var(--primary)] text-white rounded font-semibold">{editingCampaign ? "Update Cause" : "Create Cause"}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Welfare Detail Modal */}
       {showWelfareModal && (
