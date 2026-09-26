@@ -851,7 +851,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
             <form onSubmit={handleAddRosterEntry} className="space-y-3 text-xs">
               <div>
                 <label className="block font-medium mb-1">Matriculation Number *</label>
-                <input required type="text" placeholder="e.g. CLU/2021/LAW/005" value={rosterForm.matricNumber} onChange={e => setRosterForm({...rosterForm, matricNumber: e.target.value})} className="w-full p-2 border rounded font-mono" />
+                <input required type="text" placeholder="e.g. CLU/16/SC/MCB/007" value={rosterForm.matricNumber} onChange={e => setRosterForm({...rosterForm, matricNumber: e.target.value})} className="w-full p-2 border rounded font-mono" />
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>

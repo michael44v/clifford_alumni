@@ -319,7 +319,7 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
                         type="text"
                         value={matricNumber}
                         onChange={e => { setMatricNumber(e.target.value); setMatricError(""); }}
-                        placeholder="e.g. CLU/2016/LAW/001"
+                        placeholder="e.g. CLU/16/SC/MCB/007"
                         className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)] font-mono ${matricError ? "border-red-400 bg-red-50" : "border-[var(--border)]"}`}
                       />
                       {matricError && (
@@ -329,7 +329,7 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
                         </div>
                       )}
                     </div>
-                    <p className="text-[11px] text-[var(--muted-foreground)]">Demo: try <code className="bg-[var(--muted)] px-1 rounded">CLU/2016/001</code> or <code className="bg-[var(--muted)] px-1 rounded">CLU/2020/002</code></p>
+                    <p className="text-[11px] text-[var(--muted-foreground)]">Format: <code className="bg-[var(--muted)] px-1 rounded">CLU/16/SC/MCB/007</code></p>
                   </div>
 
                   <div className="flex gap-2 mt-5">

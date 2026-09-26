@@ -4,53 +4,45 @@ import { apiFetch } from "../lib/api";
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface DirectoryProps { onNavigate: (page: Page) => void; isLoggedIn: boolean; }
 
-export const GRADUATION_SETS = [
-  { set: "Alpha Set",   year: "2016" },
-  { set: "Beta Set",    year: "2017" },
-  { set: "Gamma Set",   year: "2018" },
-  { set: "Delta Set",   year: "2019" },
-  { set: "Epsilon Set", year: "2020" },
-  { set: "Zeta Set",    year: "2021" },
-  { set: "Eta Set",     year: "2022" },
-  { set: "Theta Set",   year: "2023" },
-  { set: "Iota Set",    year: "2024" },
-  { set: "Kappa Set",   year: "2025" },
-  { set: "Lambda Set",  year: "2026" },
-];
-
-export const CLU_FACULTIES = [
-  "Faculty of Science",
-  "Faculty of Basic Medical Sciences",
-  "Faculty of Management & Social Sciences",
-  "Faculty of Humanities/Education",
-  "Law Faculty",
-  "JUPEB Program",
-  "OTHERS",
-];
-
 export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
   const [search, setSearch] = useState("");
-  const [faculty, setFaculty] = useState("All Faculties");
-  const [gradSet, setGradSet] = useState("All Sets");
+  const [selectedFacultyId, setSelectedFacultyId] = useState("ALL");
+  const [selectedSetId, setSelectedSetId] = useState("ALL");
+
+  const [faculties, setFaculties] = useState<any[]>([]);
+  const [sets, setSets] = useState<any[]>([]);
   const [alumni, setAlumni] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedAlum, setSelectedAlum] = useState<any | null>(null);
 
   useEffect(() => {
+    // Fetch reference data for dropdowns
+    Promise.all([
+      apiFetch("/api/admin/faculties").catch(() => []),
+      apiFetch("/api/admin/sets").catch(() => []),
+    ]).then(([facRes, setRes]) => {
+      setFaculties(Array.isArray(facRes) ? facRes : []);
+      setSets(Array.isArray(setRes) ? setRes : []);
+    });
+  }, []);
+
+  useEffect(() => {
     if (!isLoggedIn) return;
     setLoading(true);
-    const url = `/api/members/directory?search=${encodeURIComponent(search)}`;
+
+    let url = `/api/members/directory?search=${encodeURIComponent(search)}`;
+    if (selectedFacultyId !== "ALL") url += `&facultyId=${encodeURIComponent(selectedFacultyId)}`;
+    if (selectedSetId !== "ALL") url += `&setId=${encodeURIComponent(selectedSetId)}`;
+
     apiFetch(url)
       .then(res => setAlumni(res.data || []))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
-  }, [isLoggedIn, search]);
+  }, [isLoggedIn, search, selectedFacultyId, selectedSetId]);
 
   const filtered = alumni.filter(a => {
-    const facultyName = a.faculty?.name || "";
-    const setName = a.graduatingSet?.setName || "";
-    const matchFaculty = faculty === "All Faculties" || facultyName === faculty;
-    const matchSet = gradSet === "All Sets" || setName === gradSet;
+    const matchFaculty = selectedFacultyId === "ALL" || a.facultyId === selectedFacultyId || a.faculty?.id === selectedFacultyId;
+    const matchSet = selectedSetId === "ALL" || a.graduatingSetId === selectedSetId || a.graduatingSet?.id === selectedSetId;
     return matchFaculty && matchSet;
   });
 
@@ -60,7 +52,7 @@ export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
         <p className="text-[var(--accent)] text-xs font-semibold tracking-widest uppercase mb-3">Network</p>
         <h1 className="font-display text-4xl sm:text-5xl font-bold mb-4">Alumni Directory</h1>
         <p className="text-white/70 text-base max-w-xl mx-auto">
-          Search and connect with Clifford University graduates across all faculties, sets, and locations.
+          Search and connect with Clifford University graduates across all faculties and sets.
         </p>
       </div>
 
@@ -91,13 +83,13 @@ export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
             <button className="px-6 py-2.5 bg-[var(--primary)] text-white rounded-lg text-sm font-semibold hover:bg-[var(--accent)] transition-colors">Search</button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <select value={faculty} onChange={e => setFaculty(e.target.value)} className="px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
-              <option>All Faculties</option>
-              {CLU_FACULTIES.map(f => <option key={f}>{f}</option>)}
+            <select value={selectedFacultyId} onChange={e => setSelectedFacultyId(e.target.value)} className="px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
+              <option value="ALL">All Faculties</option>
+              {faculties.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
-            <select value={gradSet} onChange={e => setGradSet(e.target.value)} className="px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
-              <option>All Sets</option>
-              {GRADUATION_SETS.map(s => <option key={s.set} value={s.set}>{s.set} ({s.year})</option>)}
+            <select value={selectedSetId} onChange={e => setSelectedSetId(e.target.value)} className="px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
+              <option value="ALL">All Graduating Sets</option>
+              {sets.map(s => <option key={s.id} value={s.id}>{s.setName} ({s.graduationYear})</option>)}
             </select>
           </div>
         </div>
@@ -113,11 +105,10 @@ export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filtered.map((alum) => {
               const fullName = `${alum.firstName || ''} ${alum.lastName || ''}`.trim() || 'Alumnus';
-              const imgUrl = alum.profilePhoto?.url || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&auto=format";
+              const imgUrl = alum.profilePhoto?.secureUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&auto=format";
               const setName = alum.graduatingSet?.setName || "Alumni";
-              const setYear = alum.graduatingSet?.year || "";
+              const setYear = alum.graduatingSet?.graduationYear || alum.graduatingSet?.year || "";
               const facName = alum.faculty?.name || "";
-              const locState = alum.location?.state || "Nigeria";
 
               return (
                 <div key={alum.id || fullName} className="bg-white border border-[var(--border)] rounded-xl overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedAlum(alum)}>
@@ -132,7 +123,6 @@ export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
                     <p className="text-[11px] text-[var(--primary)] font-medium">{setName} {setYear ? `· ${setYear}` : ''}</p>
                     {facName && <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">{facName.replace("Faculty of ", "")}</p>}
                     <p className="text-xs text-[var(--muted-foreground)] mt-1">{alum.profession || alum.company || "Alumnus"}</p>
-                    <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5">📍 {locState}</p>
                     <button className="mt-3 w-full py-1.5 border border-[var(--border)] rounded-lg text-xs font-medium text-[var(--foreground)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors">
                       View Profile
                     </button>
@@ -157,7 +147,7 @@ export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelectedAlum(null)}>
           <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="h-48 bg-[var(--muted)] overflow-hidden relative">
-              <img src={selectedAlum.profilePhoto?.url || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&auto=format"} alt={`${selectedAlum.firstName} ${selectedAlum.lastName}`} className="w-full h-full object-cover" />
+              <img src={selectedAlum.profilePhoto?.secureUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&auto=format"} alt={`${selectedAlum.firstName} ${selectedAlum.lastName}`} className="w-full h-full object-cover" />
               <button onClick={() => setSelectedAlum(null)} className="absolute top-3 right-3 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center text-sm hover:bg-black/70">✕</button>
             </div>
             <div className="p-6">
@@ -166,12 +156,11 @@ export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
                 <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-green-100 text-green-700">Verified</span>
               </div>
               <p className="text-[var(--primary)] font-medium text-sm mb-3">
-                {selectedAlum.graduatingSet?.setName} ({selectedAlum.graduatingSet?.year}) · {selectedAlum.faculty?.name}
+                {selectedAlum.graduatingSet?.setName} ({selectedAlum.graduatingSet?.graduationYear}) · {selectedAlum.faculty?.name}
               </p>
               <div className="space-y-1.5 text-sm">
                 <p><span className="font-medium">Profession:</span> <span className="text-[var(--muted-foreground)]">{selectedAlum.profession || 'N/A'}</span></p>
                 <p><span className="font-medium">Company:</span> <span className="text-[var(--muted-foreground)]">{selectedAlum.company || 'N/A'}</span></p>
-                <p><span className="font-medium">Location:</span> <span className="text-[var(--muted-foreground)]">📍 {selectedAlum.location?.state || 'Nigeria'}</span></p>
                 {selectedAlum.email && <p><span className="font-medium">Email:</span> <span className="text-[var(--muted-foreground)]">{selectedAlum.email}</span></p>}
                 {selectedAlum.phone && <p><span className="font-medium">Phone:</span> <span className="text-[var(--muted-foreground)]">{selectedAlum.phone}</span></p>}
               </div>
