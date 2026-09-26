@@ -1,46 +1,62 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { apiFetch } from "../lib/api";
 
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface DonateProps { onNavigate: (page: Page) => void; isLoggedIn: boolean; }
 
-const causes = [
-  { id: "welfare", icon: "❤️", title: "Welfare Fund", desc: "Support members facing medical emergencies, bereavement, or financial hardship", raised: 2450000, goal: 5000000 },
-  { id: "scholarship", icon: "🎓", title: "Alumni Scholarship", desc: "Fund tuition for outstanding students from disadvantaged backgrounds", raised: 1820000, goal: 3000000 },
-  { id: "university", icon: "🏛️", title: "University Development", desc: "Contribute to infrastructure, library resources and campus improvements at CLU", raised: 780000, goal: 2000000 },
-];
-
 const amounts = [1000, 2000, 5000, 10000, 25000, 50000];
 
-function fmt(n: number) { return "₦" + n.toLocaleString(); }
+function fmt(n: number) { return "₦" + Number(n || 0).toLocaleString(); }
 
 export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
-  const [selectedCause, setSelectedCause] = useState("welfare");
+  const [causes, setCauses] = useState<any[]>([]);
+  const [selectedCauseId, setSelectedCauseId] = useState<string>("");
   const [amount, setAmount] = useState<number | "">("");
   const [customAmount, setCustomAmount] = useState("");
   const [anonymous, setAnonymous] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const fetchCampaigns = async () => {
+    setLoading(true);
+    try {
+      const res = await apiFetch("/api/finance/campaigns");
+      const list = Array.isArray(res) ? res : res.data || [];
+      setCauses(list);
+      if (list.length > 0 && !selectedCauseId) {
+        setSelectedCauseId(list[0].id);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCampaigns();
+  }, []);
+
   const finalAmount = amount !== "" ? amount : parseInt(customAmount) || 0;
+  const currentCause = causes.find(c => c.id === selectedCauseId) || causes[0];
 
   const handleDonate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isLoggedIn) { onNavigate("login"); return; }
-    if (finalAmount < 100) return;
+    if (!currentCause || finalAmount < 100) return;
     setLoading(true);
     try {
-      // In prisma schema donate requires donationCampaignId, fallback or donate endpoint
       await apiFetch("/api/finance/donate", {
         method: "POST",
         body: JSON.stringify({
-          donationCampaignId: "00000000-0000-0000-0000-000000000000",
+          donationCampaignId: currentCause.id,
           amount: finalAmount,
         }),
-      }).catch(() => {}); // fallback if dummy campaign ID missing
+      });
       setSubmitted(true);
+      fetchCampaigns();
     } catch (err: any) {
-      setSubmitted(true);
+      alert(err.message || "Donation failed");
     } finally {
       setLoading(false);
     }
@@ -59,32 +75,42 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-14">
         {/* Causes */}
         <h2 className="font-display text-2xl font-bold text-[var(--secondary)] mb-6">Choose a Cause</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
-          {causes.map(cause => {
-            const pct = Math.round((cause.raised / cause.goal) * 100);
-            return (
-              <div
-                key={cause.id}
-                onClick={() => setSelectedCause(cause.id)}
-                className={`bg-white border rounded p-5 cursor-pointer transition-all ${selectedCause === cause.id ? "border-[var(--primary)] shadow-md ring-1 ring-[var(--primary)]" : "border-[var(--border)] hover:border-[var(--primary)]"}`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-2xl">{cause.icon}</span>
-                  {selectedCause === cause.id && <span className="w-5 h-5 bg-[var(--primary)] rounded-full flex items-center justify-center text-white text-xs">✓</span>}
+        {causes.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
+            {causes.map(cause => {
+              const raised = Number(cause.raisedAmount || 0);
+              const goal = Number(cause.targetAmount || 1);
+              const pct = Math.min(100, Math.round((raised / goal) * 100));
+              const isSelected = selectedCauseId === cause.id;
+
+              return (
+                <div
+                  key={cause.id}
+                  onClick={() => setSelectedCauseId(cause.id)}
+                  className={`bg-white border rounded p-5 cursor-pointer transition-all ${isSelected ? "border-[var(--primary)] shadow-md ring-1 ring-[var(--primary)]" : "border-[var(--border)] hover:border-[var(--primary)]"}`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-2xl">❤️</span>
+                    {isSelected && <span className="w-5 h-5 bg-[var(--primary)] rounded-full flex items-center justify-center text-white text-xs font-bold">✓</span>}
+                  </div>
+                  <h3 className="font-semibold text-sm text-[var(--foreground)] mb-1">{cause.title}</h3>
+                  <p className="text-xs text-[var(--muted-foreground)] leading-relaxed mb-3">{cause.description}</p>
+                  <div className="w-full h-1.5 bg-[var(--muted)] rounded-full overflow-hidden mb-1">
+                    <div className="h-full bg-[var(--primary)] rounded-full transition-all" style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="flex justify-between text-[10px] text-[var(--muted-foreground)] font-medium">
+                    <span>{fmt(raised)} raised</span>
+                    <span>{pct}% of {fmt(goal)}</span>
+                  </div>
                 </div>
-                <h3 className="font-semibold text-sm text-[var(--foreground)] mb-1">{cause.title}</h3>
-                <p className="text-xs text-[var(--muted-foreground)] leading-relaxed mb-3">{cause.desc}</p>
-                <div className="w-full h-1.5 bg-[var(--muted)] rounded-full overflow-hidden mb-1">
-                  <div className="h-full bg-[var(--primary)] rounded-full" style={{ width: `${pct}%` }} />
-                </div>
-                <div className="flex justify-between text-[10px] text-[var(--muted-foreground)]">
-                  <span>{fmt(cause.raised)} raised</span>
-                  <span>{pct}% of {fmt(cause.goal)}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="bg-white border border-[var(--border)] rounded-lg p-8 text-center text-[var(--muted-foreground)] mb-10">
+            <p className="text-sm">No active donation causes listed at this time.</p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Donation form */}
@@ -96,11 +122,10 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
                 <span className="text-5xl block mb-3">🎉</span>
                 <p className="font-display text-xl font-bold text-green-800 mb-2">Thank you!</p>
                 <p className="text-sm text-green-700 leading-relaxed mb-2">
-                  Your donation of <strong>{fmt(finalAmount)}</strong> to the <strong>{causes.find(c => c.id === selectedCause)?.title}</strong> has been received.
+                  Your donation of <strong>{fmt(finalAmount)}</strong> to <strong>{currentCause?.title}</strong> has been received.
                 </p>
                 <p className="text-xs text-green-600 mb-4">
-                  Transaction ID: TXN-CUAA-{Date.now().toString().slice(-8)}<br />
-                  A receipt has been sent to your registered email.
+                  A receipt has been recorded under your transaction history.
                 </p>
                 <button onClick={() => setSubmitted(false)} className="px-6 py-2.5 bg-green-700 text-white rounded text-sm font-semibold">Make Another Donation</button>
               </div>
@@ -127,7 +152,7 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
 
                 <div className="bg-[var(--muted)] rounded p-3 text-sm">
                   <span className="font-medium">Donating to: </span>
-                  <span className="text-[var(--primary)]">{causes.find(c => c.id === selectedCause)?.title}</span>
+                  <span className="text-[var(--primary)] font-semibold">{currentCause?.title || "Donation Cause"}</span>
                   {finalAmount > 0 && <span className="ml-2 font-semibold">— {fmt(finalAmount)}</span>}
                 </div>
 
@@ -144,7 +169,7 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
 
                 <button
                   type="submit"
-                  disabled={finalAmount < 100}
+                  disabled={finalAmount < 100 || !currentCause}
                   className="w-full py-3 bg-[var(--primary)] text-white font-semibold rounded text-sm hover:bg-[var(--accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {finalAmount >= 100 ? `Donate ${fmt(finalAmount)}` : "Enter an amount to continue"}
@@ -161,7 +186,6 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
                 {[
                   { label: "Members supported through welfare", value: "34" },
                   { label: "Scholarships awarded", value: "12" },
-                  { label: "Total donations received", value: "₦6.35M" },
                   { label: "Donors this year", value: "287" },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex justify-between items-center border-b border-[var(--border)] pb-2 last:border-0 last:pb-0">

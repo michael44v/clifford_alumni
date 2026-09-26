@@ -20,6 +20,20 @@ const payDuesSchema = z.object({
   paymentMethod: z.nativeEnum(PaymentMethod).optional(),
 });
 
+const createCampaignSchema = z.object({
+  title: z.string().min(3),
+  description: z.string().min(5),
+  targetAmount: z.number().positive(),
+  isActive: z.boolean().optional(),
+});
+
+const updateCampaignSchema = z.object({
+  title: z.string().min(3).optional(),
+  description: z.string().min(5).optional(),
+  targetAmount: z.number().positive().optional(),
+  isActive: z.boolean().optional(),
+});
+
 const donateSchema = z.object({
   donationCampaignId: z.string().uuid(),
   amount: z.number().positive(),
@@ -101,16 +115,63 @@ router.delete("/dues/:id", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", 
   }
 });
 
-// GET /api/finance/campaigns
+// GET /api/finance/campaigns (Public & Admin list)
 router.get("/campaigns", async (req, res) => {
   try {
+    const showAll = req.query.all === "true";
+    const whereClause = showAll ? {} : { isActive: true };
     const campaigns = await prisma.donationCampaign.findMany({
-      where: { isActive: true },
+      where: whereClause,
       orderBy: { createdAt: "desc" },
     });
     return res.json(campaigns);
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch campaigns" });
+  }
+});
+
+// POST /api/finance/campaigns (Admin Create Campaign/Cause)
+router.post("/campaigns", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "FINANCE_ADMIN"), validateBody(createCampaignSchema), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { title, description, targetAmount, isActive } = req.body;
+    const campaign = await prisma.donationCampaign.create({
+      data: {
+        title,
+        description,
+        targetAmount,
+        isActive: isActive !== undefined ? isActive : true,
+      },
+    });
+    return res.status(201).json(campaign);
+  } catch (err) {
+    console.error("Create campaign error:", err);
+    return res.status(500).json({ error: "Failed to create donation campaign" });
+  }
+});
+
+// PUT /api/finance/campaigns/:id (Admin Update Cause/Campaign)
+router.put("/campaigns/:id", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "FINANCE_ADMIN"), validateBody(updateCampaignSchema), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const campaign = await prisma.donationCampaign.update({
+      where: { id },
+      data: req.body,
+    });
+    return res.json(campaign);
+  } catch (err) {
+    console.error("Update campaign error:", err);
+    return res.status(500).json({ error: "Failed to update donation campaign" });
+  }
+});
+
+// DELETE /api/finance/campaigns/:id (Admin Delete Campaign)
+router.delete("/campaigns/:id", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "FINANCE_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    await prisma.donationCampaign.delete({ where: { id } });
+    return res.json({ message: "Donation campaign deleted successfully" });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to delete donation campaign" });
   }
 });
 

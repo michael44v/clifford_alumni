@@ -53,9 +53,8 @@ function Dropdown({ label: triggerLabel, items, currentPage, onNavigate, isActiv
   return (
     <div className="relative" ref={ref}>
       <button
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        onClick={() => setOpen(!open)}
+        type="button"
+        onClick={() => setOpen(prev => !prev)}
         className={`flex items-center gap-1 px-3 py-2 text-[13px] font-medium rounded transition-colors ${
           isActive ? "text-[var(--primary)] bg-[var(--muted)]" : "text-[var(--foreground)] hover:text-[var(--primary)] hover:bg-[var(--muted)]"
         }`}
@@ -66,12 +65,11 @@ function Dropdown({ label: triggerLabel, items, currentPage, onNavigate, isActiv
       {open && (
         <div
           className="absolute top-full left-0 mt-1 w-52 bg-white rounded-lg border border-[var(--border)] shadow-lg py-1 z-50"
-          onMouseEnter={() => setOpen(true)}
-          onMouseLeave={() => setOpen(false)}
         >
           {items.map(({ label, page, icon }) => (
             <button
               key={label}
+              type="button"
               onClick={() => { onNavigate(page); setOpen(false); }}
               className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition-colors ${
                 currentPage === page ? "bg-[var(--muted)] text-[var(--primary)]" : "text-[var(--foreground)] hover:bg-[var(--muted)] hover:text-[var(--primary)]"

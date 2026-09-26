@@ -35,6 +35,13 @@ router.get("/", async (req, res) => {
         include: {
           banner: true,
           _count: { select: { registrations: true } },
+          registrations: {
+            include: {
+              member: {
+                select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+              },
+            },
+          },
         },
       }),
       prisma.event.count(),
