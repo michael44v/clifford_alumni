@@ -130,10 +130,10 @@ router.get("/landing-page", async (req, res) => {
   }
 });
 
-// POST /api/gallery/upload-multiple (Authenticated User upload multiple photos)
+// POST /api/gallery/upload-multiple (Authenticated User/Admin upload multiple photos)
 router.post("/upload-multiple", authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { albumId, albumTitle, category, photos } = req.body;
+    const { albumId, albumTitle, category, photos, isFeatured } = req.body;
 
     if (!Array.isArray(photos) || photos.length === 0) {
       return res.status(400).json({ error: "At least one photo is required" });
@@ -148,7 +148,7 @@ router.post("/upload-multiple", authenticateJWT, async (req: AuthenticatedReques
         data: {
           title: titleToUse,
           category: category || GalleryCategory.INDIVIDUAL_ALUMNI,
-          description: "User uploaded showcase photos",
+          description: "Uploaded showcase photos",
         },
       });
       targetAlbumId = newAlbum.id;
@@ -159,6 +159,7 @@ router.post("/upload-multiple", authenticateJWT, async (req: AuthenticatedReques
     for (const item of photos) {
       const photoUrl = typeof item === "string" ? item : item.url;
       const caption = typeof item === "string" ? "" : (item.caption || "");
+      const photoIsFeatured = typeof item === "string" ? Boolean(isFeatured) : Boolean(item.isFeatured ?? isFeatured ?? false);
 
       if (!photoUrl) continue;
 
@@ -177,6 +178,7 @@ router.post("/upload-multiple", authenticateJWT, async (req: AuthenticatedReques
           albumId: targetAlbumId,
           mediaId: media.id,
           caption: caption,
+          isFeatured: photoIsFeatured,
           uploadedById: req.user!.userId,
         },
         include: { media: true, album: true },

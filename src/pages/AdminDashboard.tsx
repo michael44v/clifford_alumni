@@ -43,6 +43,16 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [editingCampaign, setEditingCampaign] = useState<any | null>(null);
   const [selectedEventAttendees, setSelectedEventAttendees] = useState<any | null>(null);
 
+  // Admin Upload Modal state
+  const [showAdminUploadModal, setShowAdminUploadModal] = useState(false);
+  const [adminUploadAlbumTitle, setAdminUploadAlbumTitle] = useState("");
+  const [adminUploadCategory, setAdminUploadCategory] = useState("ALUMNI_EVENT");
+  const [adminSelectedAlbumId, setAdminSelectedAlbumId] = useState("");
+  const [adminImageUrls, setAdminImageUrls] = useState<string[]>([""]);
+  const [adminCaptions, setAdminCaptions] = useState<string[]>([""]);
+  const [adminSetLandingPage, setAdminSetLandingPage] = useState(true);
+  const [isAdminSubmitting, setIsAdminSubmitting] = useState(false);
+
   // Forms
   const [eventForm, setEventForm] = useState({ title: "", description: "", date: "", time: "", venue: "", category: "General", organizer: "CUAA" });
   const [newsForm, setNewsForm] = useState({ title: "", content: "", category: "OFFICIAL_ANNOUNCEMENT" });
@@ -143,6 +153,47 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       fetchData();
     } catch (err: any) {
       alert(err.message || "Failed to delete photo");
+    }
+  };
+
+  const handleAdminUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const validPhotos = adminImageUrls
+      .map((url, idx) => ({
+        url: url.trim(),
+        caption: adminCaptions[idx] ? adminCaptions[idx].trim() : "",
+        isFeatured: adminSetLandingPage,
+      }))
+      .filter(p => p.url.length > 0);
+
+    if (validPhotos.length === 0) {
+      alert("Please enter at least one photo URL or upload an image file.");
+      return;
+    }
+
+    setIsAdminSubmitting(true);
+    try {
+      await apiFetch("/api/gallery/upload-multiple", {
+        method: "POST",
+        body: JSON.stringify({
+          albumId: adminSelectedAlbumId || undefined,
+          albumTitle: adminUploadAlbumTitle || undefined,
+          category: adminUploadCategory,
+          photos: validPhotos,
+          isFeatured: adminSetLandingPage,
+        }),
+      });
+
+      alert(`Successfully uploaded ${validPhotos.length} photo(s)!`);
+      setShowAdminUploadModal(false);
+      setAdminUploadAlbumTitle("");
+      setAdminImageUrls([""]);
+      setAdminCaptions([""]);
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to upload photos");
+    } finally {
+      setIsAdminSubmitting(false);
     }
   };
 
@@ -651,16 +702,24 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         {/* Media Tab */}
         {activeTab === "media" && (
           <div className="bg-white border border-[var(--border)] rounded overflow-hidden p-5">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-2 border-b border-[var(--border)] pb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3 border-b border-[var(--border)] pb-4">
               <div>
                 <h3 className="font-bold text-base text-[var(--secondary)]">Uploaded Photos Media Manager</h3>
                 <p className="text-xs text-[var(--muted-foreground)]">
-                  Review all user-uploaded photos. Select photos to show on the public landing page showcase or delete inappropriate uploads.
+                  Review all user-uploaded photos. Upload pictures directly and set them for the public landing page showcase or delete inappropriate uploads.
                 </p>
               </div>
-              <span className="px-3 py-1 bg-[var(--muted)] text-[var(--primary)] font-bold text-xs rounded">
-                Total Photos: {galleryPhotos.length}
-              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowAdminUploadModal(true)}
+                  className="px-4 py-2 bg-[var(--primary)] text-white rounded text-xs font-bold hover:bg-[var(--accent)] transition-colors shadow-sm"
+                >
+                  📷 + Upload Admin Photos
+                </button>
+                <span className="px-3 py-1.5 bg-[var(--muted)] text-[var(--primary)] font-bold text-xs rounded">
+                  Total Photos: {galleryPhotos.length}
+                </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -1035,6 +1094,192 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
           </div>
         )}
       </div>
+
+      {/* Admin Photo Upload Modal */}
+      {showAdminUploadModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-start border-b border-[var(--border)] pb-3">
+              <div>
+                <h2 className="font-display text-xl font-bold text-[var(--secondary)]">Admin Upload Showcase Photos</h2>
+                <p className="text-xs text-[var(--muted-foreground)]">Upload pictures to the media gallery and set them to display on the landing page showcase.</p>
+              </div>
+              <button onClick={() => setShowAdminUploadModal(false)} className="text-gray-400 hover:text-gray-600 font-bold text-xl">✕</button>
+            </div>
+
+            <form onSubmit={handleAdminUploadSubmit} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium mb-1">Select Album or Create New</label>
+                  <select
+                    value={adminSelectedAlbumId}
+                    onChange={e => {
+                      setAdminSelectedAlbumId(e.target.value);
+                      if (e.target.value) setAdminUploadAlbumTitle("");
+                    }}
+                    className="w-full p-2 border border-[var(--border)] rounded bg-white"
+                  >
+                    <option value="">-- Create New Album --</option>
+                    {Array.from(new Map(galleryPhotos.map(p => [p.album?.id, p.album])).values())
+                      .filter(Boolean)
+                      .map((a: any) => (
+                        <option key={a.id} value={a.id}>{a.title} ({a.category})</option>
+                      ))}
+                  </select>
+                </div>
+                {!adminSelectedAlbumId && (
+                  <div>
+                    <label className="block font-medium mb-1">New Album Title</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Official University Campus Showcase"
+                      value={adminUploadAlbumTitle}
+                      onChange={e => setAdminUploadAlbumTitle(e.target.value)}
+                      className="w-full p-2 border border-[var(--border)] rounded"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {!adminSelectedAlbumId && (
+                <div>
+                  <label className="block font-medium mb-1">Album Category</label>
+                  <select
+                    value={adminUploadCategory}
+                    onChange={e => setAdminUploadCategory(e.target.value)}
+                    className="w-full p-2 border border-[var(--border)] rounded bg-white"
+                  >
+                    <option value="ALUMNI_EVENT">ALUMNI_EVENT</option>
+                    <option value="INDIVIDUAL_ALUMNI">INDIVIDUAL_ALUMNI</option>
+                    <option value="GRADUATING_SET">GRADUATING_SET</option>
+                    <option value="REUNION">REUNION</option>
+                    <option value="AGM">AGM</option>
+                    <option value="UNIVERSITY_MEMORIES">UNIVERSITY_MEMORIES</option>
+                    <option value="HISTORICAL_ARCHIVE">HISTORICAL_ARCHIVE</option>
+                    <option value="OTHER">OTHER</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Showcase Checkbox */}
+              <div className="p-3 bg-amber-50 border border-amber-300 rounded flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="adminSetLandingPage"
+                  checked={adminSetLandingPage}
+                  onChange={e => setAdminSetLandingPage(e.target.checked)}
+                  className="w-4 h-4 text-amber-600 rounded"
+                />
+                <label htmlFor="adminSetLandingPage" className="font-bold text-amber-900 cursor-pointer">
+                  🌟 Set these uploaded photos to appear on the public Landing Page Showcase
+                </label>
+              </div>
+
+              {/* Photos List */}
+              <div>
+                <label className="block font-semibold text-sm mb-2 text-[var(--foreground)]">Select Images / Provide Photo URLs ({adminImageUrls.length})</label>
+                <div className="space-y-3">
+                  {adminImageUrls.map((url, idx) => (
+                    <div key={idx} className="p-3 bg-[var(--muted)] border border-[var(--border)] rounded space-y-2 relative">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[var(--primary)]">Photo #{idx + 1}</span>
+                        {adminImageUrls.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAdminImageUrls(adminImageUrls.filter((_, i) => i !== idx));
+                              setAdminCaptions(adminCaptions.filter((_, i) => i !== idx));
+                            }}
+                            className="text-red-500 text-xs font-semibold hover:underline"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] text-[var(--muted-foreground)] mb-1">Upload File (Image File)</label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={e => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  const newUrls = [...adminImageUrls];
+                                  newUrls[idx] = reader.result as string;
+                                  setAdminImageUrls(newUrls);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                            className="w-full text-[11px] bg-white border rounded p-1"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-[var(--muted-foreground)] mb-1">Or Direct Image URL</label>
+                          <input
+                            type="text"
+                            placeholder="https://images.unsplash.com/..."
+                            value={url.startsWith("data:") ? "[Local File Uploaded]" : url}
+                            onChange={e => {
+                              const newUrls = [...adminImageUrls];
+                              newUrls[idx] = e.target.value;
+                              setAdminImageUrls(newUrls);
+                            }}
+                            className="w-full p-2 border rounded bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] text-[var(--muted-foreground)] mb-1">Caption / Description (Optional)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Official Graduation ceremony highlights"
+                          value={adminCaptions[idx]}
+                          onChange={e => {
+                            const newCaps = [...adminCaptions];
+                            newCaps[idx] = e.target.value;
+                            setAdminCaptions(newCaps);
+                          }}
+                          className="w-full p-2 border rounded bg-white"
+                        />
+                      </div>
+
+                      {url && (
+                        <div className="mt-1 h-20 w-20 rounded overflow-hidden border border-[var(--border)]">
+                          <img src={url} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminImageUrls([...adminImageUrls, ""]);
+                    setAdminCaptions([...adminCaptions, ""]);
+                  }}
+                  className="mt-3 px-4 py-2 bg-white border border-[var(--primary)] text-[var(--primary)] rounded text-xs font-semibold hover:bg-[var(--primary)] hover:text-white transition-colors"
+                >
+                  + Add Another Photo
+                </button>
+              </div>
+
+              <div className="flex gap-2 justify-end pt-3 border-t border-[var(--border)]">
+                <button type="button" onClick={() => setShowAdminUploadModal(false)} className="px-4 py-2 border rounded font-medium">Cancel</button>
+                <button type="submit" disabled={isAdminSubmitting} className="px-6 py-2 bg-[var(--primary)] text-white rounded font-bold hover:bg-[var(--accent)] transition-colors">
+                  {isAdminSubmitting ? "Uploading..." : `Upload & Save ${adminImageUrls.filter(Boolean).length} Photo(s)`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Detailed Member Profile Modal */}
       {selectedMemberDetail && (
