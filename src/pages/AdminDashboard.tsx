@@ -20,6 +20,8 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [leadership, setLeadership] = useState<any[]>([]);
   const [duesItems, setDuesItems] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [impactStats, setImpactStats] = useState<any | null>(null);
+  const [scholarshipsForm, setScholarshipsForm] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Search/Filters
@@ -51,7 +53,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [statsRes, membersRes, rosterRes, welfareRes, paymentsRes, facultiesRes, setsRes, eventsRes, newsRes, leadershipRes, duesRes, campaignsRes] = await Promise.all([
+      const [statsRes, membersRes, rosterRes, welfareRes, paymentsRes, facultiesRes, setsRes, eventsRes, newsRes, leadershipRes, duesRes, campaignsRes, impactRes] = await Promise.all([
         apiFetch("/api/admin/stats").catch(() => null),
         apiFetch(`/api/admin/members?search=${encodeURIComponent(memberSearch)}&status=${memberFilterStatus}`).catch(() => []),
         apiFetch(`/api/admin/official-directory?search=${encodeURIComponent(rosterSearch)}`).catch(() => []),
@@ -64,6 +66,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         apiFetch("/api/admin/leadership").catch(() => []),
         apiFetch("/api/finance/dues").catch(() => []),
         apiFetch("/api/finance/campaigns?all=true").catch(() => []),
+        apiFetch("/api/finance/impact-stats").catch(() => null),
       ]);
 
       if (statsRes) setAdminStats(statsRes);
@@ -78,6 +81,10 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setLeadership(Array.isArray(leadershipRes) ? leadershipRes : []);
       setDuesItems(Array.isArray(duesRes) ? duesRes : duesRes?.data || []);
       setCampaigns(Array.isArray(campaignsRes) ? campaignsRes : []);
+      if (impactRes) {
+        setImpactStats(impactRes);
+        setScholarshipsForm(String(impactRes.scholarshipsAwarded || 0));
+      }
     } catch (err) {
       console.error("Admin fetchData error:", err);
     } finally {
@@ -334,6 +341,20 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       fetchData();
     } catch (err: any) {
       alert(err.message || "Failed to delete donation cause");
+    }
+  };
+
+  const handleUpdateImpactStats = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await apiFetch("/api/admin/impact-stats", {
+        method: "PUT",
+        body: JSON.stringify({ scholarshipsAwarded: Number(scholarshipsForm) }),
+      });
+      alert("Impact statistics updated!");
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to update impact statistics");
     }
   };
 
@@ -708,7 +729,41 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
 
         {/* Donations Tab */}
         {activeTab === "donations" && (
-          <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
+          <div className="space-y-6">
+            {/* Impact Statistics Editor Card */}
+            <div className="bg-white border border-[var(--border)] rounded p-5">
+              <h3 className="font-bold text-sm text-[var(--foreground)] mb-1">Live Impact Statistics</h3>
+              <p className="text-xs text-[var(--muted-foreground)] mb-4">View real-time figures displayed on the public donation page.</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                <div className="p-3 bg-[var(--muted)] rounded text-center">
+                  <p className="text-xs text-[var(--muted-foreground)]">Members Supported (Resolved Welfare)</p>
+                  <p className="font-bold text-lg text-[var(--primary)]">{impactStats?.membersSupported || 0}</p>
+                </div>
+                <div className="p-3 bg-[var(--muted)] rounded text-center">
+                  <p className="text-xs text-[var(--muted-foreground)]">Total Donations Received</p>
+                  <p className="font-bold text-lg text-green-600">₦{Number(impactStats?.totalDonationsAmount || 0).toLocaleString()}</p>
+                </div>
+                <div className="p-3 bg-[var(--muted)] rounded text-center">
+                  <p className="text-xs text-[var(--muted-foreground)]">Donors This Year</p>
+                  <p className="font-bold text-lg text-blue-600">{impactStats?.donorsThisYear || 0}</p>
+                </div>
+                <div className="p-3 bg-[var(--muted)] rounded text-center">
+                  <p className="text-xs text-[var(--muted-foreground)]">Scholarships Awarded</p>
+                  <p className="font-bold text-lg text-purple-600">{impactStats?.scholarshipsAwarded || 0}</p>
+                </div>
+              </div>
+              <form onSubmit={handleUpdateImpactStats} className="flex gap-3 items-end max-w-sm">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Set Scholarships Awarded Figure</label>
+                  <input type="number" min="0" value={scholarshipsForm} onChange={e => setScholarshipsForm(e.target.value)} className="w-full p-2 border rounded text-xs" />
+                </div>
+                <button type="submit" className="px-4 py-2 bg-[var(--primary)] text-white rounded text-xs font-semibold hover:bg-[var(--accent)]">
+                  Save Figure
+                </button>
+              </form>
+            </div>
+
+            <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
             <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
               <div>
                 <h3 className="font-bold text-sm text-[var(--foreground)]">Donation Causes & Campaigns</h3>
@@ -761,6 +816,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                 </div>
               )}
             </div>
+          </div>
           </div>
         )}
 

@@ -11,20 +11,28 @@ function fmt(n: number) { return "₦" + Number(n || 0).toLocaleString(); }
 export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
   const [causes, setCauses] = useState<any[]>([]);
   const [selectedCauseId, setSelectedCauseId] = useState<string>("");
+  const [impactStats, setImpactStats] = useState<any>({ membersSupported: 0, scholarshipsAwarded: 0, totalDonationsAmount: 0, donorsThisYear: 0 });
   const [amount, setAmount] = useState<number | "">("");
   const [customAmount, setCustomAmount] = useState("");
   const [anonymous, setAnonymous] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const fetchCampaigns = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await apiFetch("/api/finance/campaigns");
-      const list = Array.isArray(res) ? res : res.data || [];
+      const [campaignsRes, statsRes] = await Promise.all([
+        apiFetch("/api/finance/campaigns").catch(() => []),
+        apiFetch("/api/finance/impact-stats").catch(() => null),
+      ]);
+
+      const list = Array.isArray(campaignsRes) ? campaignsRes : campaignsRes.data || [];
       setCauses(list);
       if (list.length > 0 && !selectedCauseId) {
         setSelectedCauseId(list[0].id);
+      }
+      if (statsRes) {
+        setImpactStats(statsRes);
       }
     } catch (err) {
       console.error(err);
@@ -34,7 +42,7 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
   };
 
   useEffect(() => {
-    fetchCampaigns();
+    fetchData();
   }, []);
 
   const finalAmount = amount !== "" ? amount : parseInt(customAmount) || 0;
@@ -51,16 +59,19 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
         body: JSON.stringify({
           donationCampaignId: currentCause.id,
           amount: finalAmount,
+          paymentMethod: "PAYSTACK",
         }),
       });
       setSubmitted(true);
-      fetchCampaigns();
+      fetchData();
     } catch (err: any) {
       alert(err.message || "Donation failed");
     } finally {
       setLoading(false);
     }
   };
+
+  const currentYear = new Date().getFullYear();
 
   return (
     <div className="bg-[var(--background)]">
@@ -122,10 +133,10 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
                 <span className="text-5xl block mb-3">🎉</span>
                 <p className="font-display text-xl font-bold text-green-800 mb-2">Thank you!</p>
                 <p className="text-sm text-green-700 leading-relaxed mb-2">
-                  Your donation of <strong>{fmt(finalAmount)}</strong> to <strong>{currentCause?.title}</strong> has been received.
+                  Your Paystack donation of <strong>{fmt(finalAmount)}</strong> to <strong>{currentCause?.title}</strong> has been received.
                 </p>
                 <p className="text-xs text-green-600 mb-4">
-                  A receipt has been recorded under your transaction history.
+                  A payment record and receipt have been generated for your account.
                 </p>
                 <button onClick={() => setSubmitted(false)} className="px-6 py-2.5 bg-green-700 text-white rounded text-sm font-semibold">Make Another Donation</button>
               </div>
@@ -150,10 +161,13 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
                   />
                 </div>
 
-                <div className="bg-[var(--muted)] rounded p-3 text-sm">
-                  <span className="font-medium">Donating to: </span>
-                  <span className="text-[var(--primary)] font-semibold">{currentCause?.title || "Donation Cause"}</span>
-                  {finalAmount > 0 && <span className="ml-2 font-semibold">— {fmt(finalAmount)}</span>}
+                <div className="bg-[var(--muted)] rounded p-3 text-sm flex justify-between items-center">
+                  <div>
+                    <span className="font-medium">Donating to: </span>
+                    <span className="text-[var(--primary)] font-semibold">{currentCause?.title || "General Fund"}</span>
+                    {finalAmount > 0 && <span className="ml-2 font-semibold">— {fmt(finalAmount)}</span>}
+                  </div>
+                  <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">Paystack</span>
                 </div>
 
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -172,7 +186,7 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
                   disabled={finalAmount < 100 || !currentCause}
                   className="w-full py-3 bg-[var(--primary)] text-white font-semibold rounded text-sm hover:bg-[var(--accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {finalAmount >= 100 ? `Donate ${fmt(finalAmount)}` : "Enter an amount to continue"}
+                  {finalAmount >= 100 ? `Donate ${fmt(finalAmount)} via Paystack` : "Enter an amount to continue"}
                 </button>
               </form>
             )}
@@ -181,12 +195,13 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
           {/* Impact sidebar */}
           <div className="space-y-5">
             <div className="bg-white border border-[var(--border)] rounded p-5">
-              <h3 className="font-semibold text-[var(--foreground)] mb-4">Your Impact in 2024</h3>
+              <h3 className="font-semibold text-[var(--foreground)] mb-4">Your Impact in {currentYear}</h3>
               <div className="space-y-3">
                 {[
-                  { label: "Members supported through welfare", value: "34" },
-                  { label: "Scholarships awarded", value: "12" },
-                  { label: "Donors this year", value: "287" },
+                  { label: "Members supported through welfare", value: impactStats.membersSupported || 0 },
+                  { label: "Scholarships awarded", value: impactStats.scholarshipsAwarded || 0 },
+                  { label: "Total donations received", value: fmt(impactStats.totalDonationsAmount || 0) },
+                  { label: "Donors this year", value: impactStats.donorsThisYear || 0 },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex justify-between items-center border-b border-[var(--border)] pb-2 last:border-0 last:pb-0">
                     <span className="text-xs text-[var(--muted-foreground)]">{label}</span>
@@ -208,9 +223,9 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
             </div>
 
             <div className="bg-white border border-[var(--border)] rounded p-5">
-              <p className="text-xs font-semibold text-[var(--foreground)] mb-2">🔒 Secure Transactions</p>
+              <p className="text-xs font-semibold text-[var(--foreground)] mb-2">🔒 Paystack Secure Gateway</p>
               <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                All payments are processed securely. Every transaction generates a receipt with a unique transaction ID, date, amount, purpose and payment status.
+                All donations are processed securely via Paystack. Every transaction generates a receipt with a unique transaction reference and payment confirmation.
               </p>
             </div>
           </div>
