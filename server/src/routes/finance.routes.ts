@@ -3,9 +3,17 @@ import { z } from "zod";
 import { prisma } from "../db/prisma.js";
 import { authenticateJWT, requireRole, AuthenticatedRequest } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
-import { PaymentMethod } from "@prisma/client";
+import { PaymentMethod, DuesType } from "@prisma/client";
 
 const router = Router();
+
+const createDuesSchema = z.object({
+  title: z.string().min(3),
+  type: z.nativeEnum(DuesType).optional(),
+  amount: z.number().positive(),
+  academicYear: z.string().optional(),
+  description: z.string().optional(),
+});
 
 const payDuesSchema = z.object({
   duesItemId: z.string().uuid(),
@@ -40,12 +48,56 @@ class SimulatedPaymentGateway {
 // GET /api/finance/dues
 router.get("/dues", authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const duesList = await prisma.duesItem.findMany({
-      orderBy: { createdAt: "desc" },
-    });
-    return res.json(duesList);
+    const memberId = req.user!.userId;
+    const [duesList, myPayments] = await Promise.all([
+      prisma.duesItem.findMany({ orderBy: { createdAt: "desc" } }),
+      prisma.paymentRecord.findMany({
+        where: { memberId, status: "SUCCESSFUL" },
+        select: { duesItemId: true },
+      }),
+    ]);
+
+    const paidDuesIds = new Set(myPayments.map(p => p.duesItemId).filter(Boolean));
+
+    const result = duesList.map(item => ({
+      ...item,
+      status: paidDuesIds.has(item.id) ? "PAID" : "PENDING",
+    }));
+
+    return res.json(result);
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch dues" });
+  }
+});
+
+// POST /api/finance/dues (Admin create dues amount)
+router.post("/dues", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "FINANCE_ADMIN"), validateBody(createDuesSchema), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { title, type, amount, academicYear, description } = req.body;
+    const newDues = await prisma.duesItem.create({
+      data: {
+        title,
+        type: type || "ANNUAL_DUES",
+        amount,
+        academicYear,
+        description,
+      },
+    });
+    return res.status(201).json(newDues);
+  } catch (err) {
+    console.error("Create dues error:", err);
+    return res.status(500).json({ error: "Failed to create dues item" });
+  }
+});
+
+// DELETE /api/finance/dues/:id (Admin delete dues item)
+router.delete("/dues/:id", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "FINANCE_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    await prisma.duesItem.delete({ where: { id } });
+    return res.json({ message: "Dues item deleted successfully" });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to delete dues item" });
   }
 });
 

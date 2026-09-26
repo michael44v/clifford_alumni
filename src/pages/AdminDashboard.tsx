@@ -25,6 +25,8 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [memberFilterStatus, setMemberFilterStatus] = useState("");
   const [rosterSearch, setRosterSearch] = useState("");
 
+  const [duesItems, setDuesItems] = useState<any[]>([]);
+
   // Modals state
   const [showEventModal, setShowEventModal] = useState(false);
   const [showNewsModal, setShowNewsModal] = useState(false);
@@ -32,6 +34,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [showAOTWModal, setShowAOTWModal] = useState<any | null>(null);
   const [showRosterModal, setShowRosterModal] = useState(false);
   const [showWelfareModal, setShowWelfareModal] = useState<any | null>(null);
+  const [showDuesModal, setShowDuesModal] = useState(false);
 
   // Forms
   const [eventForm, setEventForm] = useState({ title: "", description: "", date: "", time: "", venue: "", category: "General", organizer: "CUAA" });
@@ -39,11 +42,12 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [leadershipForm, setLeadershipForm] = useState({ name: "", position: "", biography: "", termStart: new Date().getFullYear() });
   const [aotwBio, setAotwBio] = useState("");
   const [rosterForm, setRosterForm] = useState({ matricNumber: "", firstName: "", lastName: "", facultyId: "", graduatingSetId: "", department: "" });
+  const [duesForm, setDuesForm] = useState({ title: "", amount: "", type: "ANNUAL_DUES", academicYear: "2024/2025", description: "" });
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [statsRes, membersRes, rosterRes, welfareRes, paymentsRes, facultiesRes, setsRes, eventsRes, newsRes, leadershipRes] = await Promise.all([
+      const [statsRes, membersRes, rosterRes, welfareRes, paymentsRes, facultiesRes, setsRes, eventsRes, newsRes, leadershipRes, duesRes] = await Promise.all([
         apiFetch("/api/admin/stats").catch(() => null),
         apiFetch(`/api/admin/members?search=${encodeURIComponent(memberSearch)}&status=${memberFilterStatus}`).catch(() => []),
         apiFetch(`/api/admin/official-directory?search=${encodeURIComponent(rosterSearch)}`).catch(() => []),
@@ -54,6 +58,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         apiFetch("/api/events?limit=50").catch(() => []),
         apiFetch("/api/news?limit=50").catch(() => []),
         apiFetch("/api/admin/leadership").catch(() => []),
+        apiFetch("/api/finance/dues").catch(() => []),
       ]);
 
       if (statsRes) setAdminStats(statsRes);
@@ -66,6 +71,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setEvents(Array.isArray(eventsRes) ? eventsRes : eventsRes?.data || []);
       setNews(Array.isArray(newsRes) ? newsRes : newsRes?.data || []);
       setLeadership(Array.isArray(leadershipRes) ? leadershipRes : []);
+      setDuesItems(Array.isArray(duesRes) ? duesRes : duesRes?.data || []);
     } catch (err) {
       console.error("Admin fetchData error:", err);
     } finally {
@@ -247,6 +253,38 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       fetchData();
     } catch (err: any) {
       alert(err.message || "Failed to delete entry");
+    }
+  };
+
+  const handleCreateDues = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await apiFetch("/api/finance/dues", {
+        method: "POST",
+        body: JSON.stringify({
+          title: duesForm.title,
+          amount: Number(duesForm.amount),
+          type: duesForm.type,
+          academicYear: duesForm.academicYear,
+          description: duesForm.description,
+        }),
+      });
+      alert("Dues item created successfully!");
+      setShowDuesModal(false);
+      setDuesForm({ title: "", amount: "", type: "ANNUAL_DUES", academicYear: "2024/2025", description: "" });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to create dues item");
+    }
+  };
+
+  const handleDeleteDues = async (id: string) => {
+    if (!confirm("Delete this dues item?")) return;
+    try {
+      await apiFetch(`/api/finance/dues/${id}`, { method: "DELETE" });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to delete dues item");
     }
   };
 
@@ -549,40 +587,72 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
           </div>
         )}
 
-        {/* Payments Tab */}
+        {/* Payments & Dues Tab */}
         {activeTab === "payments" && (
-          <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
-            <div className="p-4 border-b border-[var(--border)]">
-              <h3 className="font-semibold text-sm">Realtime Transactions</h3>
+          <div className="space-y-6">
+            {/* Dues Manager Card */}
+            <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
+              <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
+                <div>
+                  <h3 className="font-bold text-sm text-[var(--foreground)]">Annual Dues & Levies Manager</h3>
+                  <p className="text-xs text-[var(--muted-foreground)]">Create dues items and mandatory amounts to apply to all members.</p>
+                </div>
+                <button onClick={() => setShowDuesModal(true)} className="px-3 py-1.5 bg-[var(--primary)] text-white rounded text-xs font-semibold hover:bg-[var(--accent)]">
+                  + Create Dues Amount
+                </button>
+              </div>
+              <div className="divide-y divide-[var(--border)]">
+                {duesItems.map((d) => (
+                  <div key={d.id} className="p-4 flex items-center justify-between gap-4 text-xs">
+                    <div>
+                      <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--primary)] text-[10px] font-bold rounded mb-1 inline-block">{d.type || 'ANNUAL_DUES'}</span>
+                      <p className="font-bold text-sm text-[var(--foreground)]">{d.title}</p>
+                      <p className="text-[var(--muted-foreground)]">Academic Year: {d.academicYear || '2024/2025'}</p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <p className="font-bold text-base text-[var(--primary)]">₦{Number(d.amount).toLocaleString()}</p>
+                      <button onClick={() => handleDeleteDues(d.id)} className="px-3 py-1 bg-red-100 text-red-700 rounded font-semibold hover:bg-red-200">Delete</button>
+                    </div>
+                  </div>
+                ))}
+                {duesItems.length === 0 && <p className="p-5 text-center text-xs text-[var(--muted-foreground)]">No active dues items created. Click "+ Create Dues Amount" above to set dues for members.</p>}
+              </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
-                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Member</th>
-                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Item / Campaign</th>
-                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Amount</th>
-                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Status</th>
-                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border)]">
-                  {payments.map(p => (
-                    <tr key={p.id} className="text-xs hover:bg-slate-50">
-                      <td className="p-3 font-medium">{p.member?.firstName} {p.member?.lastName}</td>
-                      <td className="p-3">{p.duesItem?.title || p.donationCampaign?.title || "Dues/Donation"}</td>
-                      <td className="p-3 font-bold text-green-600">₦{Number(p.amount).toLocaleString()}</td>
-                      <td className="p-3"><span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">{p.status}</span></td>
-                      <td className="p-3 text-[var(--muted-foreground)]">{new Date(p.createdAt).toLocaleDateString()}</td>
+
+            {/* Transactions List */}
+            <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
+              <div className="p-4 border-b border-[var(--border)]">
+                <h3 className="font-semibold text-sm">Realtime Payment Transactions</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
+                      <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Member</th>
+                      <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Item / Campaign</th>
+                      <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Amount</th>
+                      <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Status</th>
+                      <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Date</th>
                     </tr>
-                  ))}
-                  {payments.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="p-6 text-center text-xs text-[var(--muted-foreground)]">No payment records found.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {payments.map(p => (
+                      <tr key={p.id} className="text-xs hover:bg-slate-50">
+                        <td className="p-3 font-medium">{p.member?.firstName} {p.member?.lastName}</td>
+                        <td className="p-3">{p.duesItem?.title || p.donationCampaign?.title || "Dues/Donation"}</td>
+                        <td className="p-3 font-bold text-green-600">₦{Number(p.amount).toLocaleString()}</td>
+                        <td className="p-3"><span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">{p.status}</span></td>
+                        <td className="p-3 text-[var(--muted-foreground)]">{new Date(p.createdAt).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                    {payments.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="p-6 text-center text-xs text-[var(--muted-foreground)]">No payment records found.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
@@ -726,6 +796,48 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
               </div>
               <button onClick={() => setShowWelfareModal(null)} className="px-4 py-1.5 bg-[var(--primary)] text-white rounded text-xs font-semibold">Close</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Dues Item Modal */}
+      {showDuesModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="font-bold text-lg mb-2">Create Annual Dues / Levy Amount</h3>
+            <p className="text-xs text-[var(--muted-foreground)] mb-4">Set mandatory dues title and amount to apply to all members.</p>
+            <form onSubmit={handleCreateDues} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-medium mb-1">Dues Title *</label>
+                <input required type="text" placeholder="e.g. 2025 Annual Membership Dues" value={duesForm.title} onChange={e => setDuesForm({...duesForm, title: e.target.value})} className="w-full p-2 border rounded" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-medium mb-1">Amount (₦) *</label>
+                  <input required type="number" min="100" placeholder="5000" value={duesForm.amount} onChange={e => setDuesForm({...duesForm, amount: e.target.value})} className="w-full p-2 border rounded font-bold" />
+                </div>
+                <div>
+                  <label className="block font-medium mb-1">Academic Year</label>
+                  <input type="text" placeholder="2024/2025" value={duesForm.academicYear} onChange={e => setDuesForm({...duesForm, academicYear: e.target.value})} className="w-full p-2 border rounded" />
+                </div>
+              </div>
+              <div>
+                <label className="block font-medium mb-1">Dues Type</label>
+                <select value={duesForm.type} onChange={e => setDuesForm({...duesForm, type: e.target.value})} className="w-full p-2 border rounded bg-white">
+                  <option value="ANNUAL_DUES">ANNUAL_DUES</option>
+                  <option value="SPECIAL_LEVY">SPECIAL_LEVY</option>
+                  <option value="PROJECT_LEVY">PROJECT_LEVY</option>
+                </select>
+              </div>
+              <div>
+                <label className="block font-medium mb-1">Description (Optional)</label>
+                <textarea rows={2} placeholder="Optional details or instructions for members..." value={duesForm.description} onChange={e => setDuesForm({...duesForm, description: e.target.value})} className="w-full p-2 border rounded" />
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <button type="button" onClick={() => setShowDuesModal(false)} className="px-4 py-2 border rounded font-medium">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-[var(--primary)] text-white rounded font-semibold">Publish Dues</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
