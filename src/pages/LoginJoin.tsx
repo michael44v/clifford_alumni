@@ -1,5 +1,6 @@
 import { useState } from "react";
 import cuaaLogo from "@/imports/CUAA.jpg";
+import { apiFetch, setAccessToken } from "../lib/api";
 
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 
@@ -90,28 +91,73 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
     relationship: "", institution: "",
   });
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin(loginEmail === "admin@cuaa.ng");
+    try {
+      const res = await apiFetch("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: loginEmail,
+          password: loginPassword,
+        }),
+      });
+      setAccessToken(res.accessToken);
+      const isAdmin = res.member?.role === "ADMIN" || res.member?.role === "SUPER_ADMIN" || loginEmail === "admin@cuaa.ng";
+      onLogin(isAdmin);
+    } catch (err: any) {
+      alert(err.message || "Invalid credentials");
+    }
   };
 
   const verifyMatric = () => {
     const trimmed = matricNumber.trim().toUpperCase();
     setMatricError("");
     if (!trimmed) { setMatricError("Please enter your matriculation number."); return; }
-    if (VALID_MATRIC_NUMBERS.has(trimmed)) {
-      setMatricVerified(true);
-      setMatricError("");
-      setRegStep("details");
-    } else {
-      setMatricError("Matriculation number not found in the official alumni registry. If you believe this is an error, please contact the CUAA secretariat.");
-    }
+    setMatricVerified(true);
+    setRegStep("details");
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (regForm.password !== regForm.confirm) return;
-    onLogin(false);
+    const nameParts = regForm.fullName.trim().split(" ");
+    const firstName = nameParts[0] || "Member";
+    const lastName = nameParts.slice(1).join(" ") || "Alumni";
+
+    try {
+      const endpoint = memberType === "alumni" ? "/api/auth/register/alumni" : "/api/auth/register/associate";
+      const payload = memberType === "alumni"
+        ? {
+            matricNumber: matricNumber || "CLU/DEMO/001",
+            email: regForm.email,
+            password: regForm.password,
+            firstName,
+            lastName,
+            phone: regForm.phone,
+          }
+        : {
+            email: regForm.email,
+            password: regForm.password,
+            firstName,
+            lastName,
+            phone: regForm.phone,
+            relationshipToCLU: regForm.relationship || "Friend",
+            organization: regForm.institution || "N/A",
+          };
+
+      const res = await apiFetch(endpoint, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      if (res.accessToken) {
+        setAccessToken(res.accessToken);
+      }
+      alert("Registration successful!");
+      onLogin(false);
+    } catch (err: any) {
+      alert(err.message || "Registration failed");
+    }
   };
 
   const progressSteps = memberType === "alumni"

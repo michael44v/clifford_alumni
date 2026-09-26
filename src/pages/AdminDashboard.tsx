@@ -1,15 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { apiFetch } from "../lib/api";
+
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface AdminDashboardProps { onNavigate: (page: Page) => void; onLogout: () => void; }
 
-const stats = [
-  { label: "Total Alumni", value: "4,218", change: "+34 this month", color: "text-[var(--secondary)]" },
-  { label: "Verified Members", value: "3,142", change: "+21 this month", color: "text-green-600" },
-  { label: "Pending Verification", value: "87", change: "Awaiting review", color: "text-amber-600" },
-  { label: "Welfare Cases", value: "12", change: "3 urgent", color: "text-red-600" },
-  { label: "Total Donations (2024)", value: "₦6.35M", change: "+₦420K this month", color: "text-[var(--primary)]" },
-  { label: "Monthly Active Members", value: "1,820", change: "43% of verified", color: "text-blue-600" },
-];
+type AdminTab = "overview" | "members" | "welfare" | "payments" | "content" | "settings";
 
 const pendingMembers = [
   { name: "Chukwudi Nnaji", email: "chukwudi@email.com", gradYear: "2015", faculty: "Engineering", submitted: "Nov 28, 2024" },
@@ -34,11 +29,28 @@ const recentPayments = [
   { name: "Kayode Fashola", type: "Scholarship Fund", amount: 50000, date: "Nov 25" },
 ];
 
-type AdminTab = "overview" | "members" | "welfare" | "payments" | "content" | "settings";
-
 export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
+  const [adminStats, setAdminStats] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
   const [memberStatuses, setMemberStatuses] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    setLoading(true);
+    apiFetch("/api/admin/stats")
+      .then(res => setAdminStats(res))
+      .catch(err => console.error(err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const stats = [
+    { label: "Total Alumni", value: adminStats?.totalMembers || "0", change: "All registered", color: "text-[var(--secondary)]" },
+    { label: "Verified Members", value: adminStats?.verifiedMembers || "0", change: "Verified status", color: "text-green-600" },
+    { label: "Pending Verification", value: adminStats?.pendingVerifications || "0", change: "Awaiting review", color: "text-amber-600" },
+    { label: "Welfare Cases", value: adminStats?.activeWelfareCases || "0", change: "Active requests", color: "text-red-600" },
+    { label: "Total Dues (₦)", value: `₦${Number(adminStats?.financials?.totalDuesCollected || 0).toLocaleString()}`, change: "Collected", color: "text-[var(--primary)]" },
+    { label: "Total Donations (₦)", value: `₦${Number(adminStats?.financials?.totalDonationsCollected || 0).toLocaleString()}`, change: "Collected", color: "text-blue-600" },
+  ];
 
   const approveMember = (i: number) => setMemberStatuses(s => ({...s, [i]: "approved"}));
   const rejectMember = (i: number) => setMemberStatuses(s => ({...s, [i]: "rejected"}));

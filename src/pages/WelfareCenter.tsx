@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { apiFetch } from "../lib/api";
+
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface WelfareCenterProps { onNavigate: (page: Page) => void; isLoggedIn: boolean; }
 
@@ -6,12 +8,28 @@ type FormData = { category: string; urgency: string; details: string; contact: s
 
 export default function WelfareCenter({ onNavigate, isLoggedIn }: WelfareCenterProps) {
   const [submitted, setSubmitted] = useState(false);
-  const [form, setForm] = useState<FormData>({ category: "", urgency: "normal", details: "", contact: "" });
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState<FormData>({ category: "MEDICAL_EMERGENCY", urgency: "MEDIUM", details: "", contact: "" });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isLoggedIn) { onNavigate("login"); return; }
-    setSubmitted(true);
+    setLoading(true);
+    try {
+      await apiFetch("/api/welfare", {
+        method: "POST",
+        body: JSON.stringify({
+          category: form.category,
+          urgency: form.urgency.toUpperCase(),
+          description: form.details,
+        }),
+      });
+      setSubmitted(true);
+    } catch (err: any) {
+      alert(err.message || "Failed to submit request");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -81,23 +99,26 @@ export default function WelfareCenter({ onNavigate, isLoggedIn }: WelfareCenterP
                 <div>
                   <label className="block text-sm font-medium text-[var(--foreground)] mb-1.5">Request Category *</label>
                   <select required value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full px-3 py-2.5 border border-[var(--border)] rounded text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)] bg-white">
-                    <option value="">Select a category</option>
-                    <option>Medical Emergency</option>
-                    <option>Bereavement Support</option>
-                    <option>Financial Distress</option>
-                    <option>Emergency Assistance</option>
-                    <option>Illness Notification</option>
-                    <option>Member in Distress</option>
-                    <option>Other Welfare Matter</option>
+                    <option value="MEDICAL_EMERGENCY">Medical Emergency</option>
+                    <option value="BEREAVEMENT">Bereavement Support</option>
+                    <option value="FINANCIAL_HARDSHIP">Financial Hardship</option>
+                    <option value="JOB_LOSS">Job Loss</option>
+                    <option value="DISASTER_RELIEF">Disaster Relief</option>
+                    <option value="OTHER">Other Welfare Matter</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--foreground)] mb-1.5">Urgency Level *</label>
                   <div className="flex gap-3">
-                    {["normal", "urgent", "critical"].map(u => (
-                      <label key={u} className={`flex-1 py-2.5 border rounded text-xs font-medium text-center cursor-pointer transition-colors ${form.urgency === u ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border)] hover:border-[var(--primary)]"}`}>
-                        <input type="radio" name="urgency" value={u} checked={form.urgency === u} onChange={e => setForm({...form, urgency: e.target.value})} className="sr-only" />
-                        {u.charAt(0).toUpperCase() + u.slice(1)}
+                    {[
+                      { id: "LOW", label: "Low" },
+                      { id: "MEDIUM", label: "Medium" },
+                      { id: "HIGH", label: "High" },
+                      { id: "CRITICAL", label: "Critical" },
+                    ].map(u => (
+                      <label key={u.id} className={`flex-1 py-2.5 border rounded text-xs font-medium text-center cursor-pointer transition-colors ${form.urgency === u.id ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border)] hover:border-[var(--primary)]"}`}>
+                        <input type="radio" name="urgency" value={u.id} checked={form.urgency === u.id} onChange={e => setForm({...form, urgency: e.target.value})} className="sr-only" />
+                        {u.label}
                       </label>
                     ))}
                   </div>
