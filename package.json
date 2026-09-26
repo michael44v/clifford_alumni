@@ -17,6 +17,9 @@
     "react-dom": "^19.0.0",
     "tsx": "^4.23.15"
   },
+  "overrides": {
+  "esbuild": "npm:esbuild-wasm@0.28.2"
+},
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^22.0.0",
