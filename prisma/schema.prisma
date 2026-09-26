@@ -379,6 +379,7 @@ model GalleryPhoto {
   mediaId      String
   caption      String?
   uploadedById String
+  isFeatured   Boolean  @default(false)
   createdAt    DateTime @default(now())
 
   album      GalleryAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
@@ -386,6 +387,7 @@ model GalleryPhoto {
   uploadedBy Member       @relation("UploadedPhotos", fields: [uploadedById], references: [id])
 
   @@index([albumId])
+  @@index([isFeatured])
 }
 
 // -----------------------------------------------------------------------------

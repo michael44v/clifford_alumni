@@ -100,6 +100,163 @@ router.post("/albums", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "CON
   }
 });
 
+// GET /api/gallery/landing-page (Public - Landing page showcase photos)
+router.get("/landing-page", async (req, res) => {
+  try {
+    // First try fetching admin featured photos
+    let photos = await prisma.galleryPhoto.findMany({
+      where: { isFeatured: true },
+      take: 6,
+      orderBy: { createdAt: "desc" },
+      include: { media: true, album: true, uploadedBy: { select: { firstName: true, lastName: true } } },
+    });
+
+    // If less than 6 featured photos exist, complement with recent uploaded photos
+    if (photos.length < 6) {
+      const existingIds = photos.map(p => p.id);
+      const remaining = 6 - photos.length;
+      const recent = await prisma.galleryPhoto.findMany({
+        where: { id: { notIn: existingIds } },
+        take: remaining,
+        orderBy: { createdAt: "desc" },
+        include: { media: true, album: true, uploadedBy: { select: { firstName: true, lastName: true } } },
+      });
+      photos = [...photos, ...recent];
+    }
+
+    return res.json(photos);
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to fetch landing page photos" });
+  }
+});
+
+// POST /api/gallery/upload-multiple (Authenticated User upload multiple photos)
+router.post("/upload-multiple", authenticateJWT, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { albumId, albumTitle, category, photos } = req.body;
+
+    if (!Array.isArray(photos) || photos.length === 0) {
+      return res.status(400).json({ error: "At least one photo is required" });
+    }
+
+    let targetAlbumId = albumId;
+
+    // Create a new album if targetAlbumId is not provided
+    if (!targetAlbumId) {
+      const titleToUse = albumTitle || `Community Showcase - ${new Date().toLocaleDateString()}`;
+      const newAlbum = await prisma.galleryAlbum.create({
+        data: {
+          title: titleToUse,
+          category: category || GalleryCategory.INDIVIDUAL_ALUMNI,
+          description: "User uploaded showcase photos",
+        },
+      });
+      targetAlbumId = newAlbum.id;
+    }
+
+    const createdPhotos = [];
+
+    for (const item of photos) {
+      const photoUrl = typeof item === "string" ? item : item.url;
+      const caption = typeof item === "string" ? "" : (item.caption || "");
+
+      if (!photoUrl) continue;
+
+      // Create Media record
+      const media = await prisma.media.create({
+        data: {
+          cloudinaryPublicId: `gallery-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+          secureUrl: photoUrl,
+          folder: "gallery",
+        },
+      });
+
+      // Create GalleryPhoto record
+      const galleryPhoto = await prisma.galleryPhoto.create({
+        data: {
+          albumId: targetAlbumId,
+          mediaId: media.id,
+          caption: caption,
+          uploadedById: req.user!.userId,
+        },
+        include: { media: true, album: true },
+      });
+
+      createdPhotos.push(galleryPhoto);
+    }
+
+    return res.status(201).json({
+      message: `Successfully uploaded ${createdPhotos.length} photo(s)`,
+      photos: createdPhotos,
+      albumId: targetAlbumId,
+    });
+  } catch (err: any) {
+    console.error("Upload multiple gallery photos error:", err);
+    return res.status(500).json({ error: "Failed to upload gallery photos" });
+  }
+});
+
+// GET /api/admin/gallery/photos (Admin View All Uploaded Photos)
+router.get("/admin/photos", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "CONTENT_ADMIN", "MODERATOR"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const photos = await prisma.galleryPhoto.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        media: true,
+        album: true,
+        uploadedBy: {
+          select: { id: true, firstName: true, lastName: true, email: true, matricNumber: true },
+        },
+      },
+    });
+    return res.json(photos);
+  } catch (err) {
+    console.error("Admin fetch gallery photos error:", err);
+    return res.status(500).json({ error: "Failed to fetch gallery photos for admin" });
+  }
+});
+
+// PUT /api/admin/gallery/photos/:id/featured (Admin Toggle Landing Page Feature Status)
+router.put("/admin/photos/:id/featured", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "CONTENT_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const { isFeatured } = req.body;
+
+    const updated = await prisma.galleryPhoto.update({
+      where: { id },
+      data: { isFeatured: Boolean(isFeatured) },
+      include: { media: true, album: true, uploadedBy: { select: { firstName: true, lastName: true } } },
+    });
+
+    return res.json(updated);
+  } catch (err) {
+    console.error("Toggle featured photo error:", err);
+    return res.status(500).json({ error: "Failed to update featured photo status" });
+  }
+});
+
+// DELETE /api/admin/gallery/photos/:id (Admin Delete Gallery Photo)
+router.delete("/admin/photos/:id", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "CONTENT_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+
+    const photo = await prisma.galleryPhoto.findUnique({ where: { id } });
+    if (!photo) {
+      return res.status(404).json({ error: "Photo not found" });
+    }
+
+    await prisma.galleryPhoto.delete({ where: { id } });
+    if (photo.mediaId) {
+      await prisma.media.delete({ where: { id: photo.mediaId } }).catch(() => {});
+    }
+
+    return res.json({ message: "Photo deleted successfully" });
+  } catch (err) {
+    console.error("Delete photo error:", err);
+    return res.status(500).json({ error: "Failed to delete photo" });
+  }
+});
+
 // POST /api/gallery/photos (Admin / Uploaded Photo record)
 router.post("/photos", authenticateJWT, validateBody(uploadPhotoSchema), async (req: AuthenticatedRequest, res: Response) => {
   try {

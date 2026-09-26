@@ -34,6 +34,7 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
   const [featuredAlumni, setFeaturedAlumni] = useState<any[]>([]);
   const [alumniOfWeek, setAlumniOfWeek] = useState<any | null>(null);
   const [leadership, setLeadership] = useState<any[]>([]);
+  const [showcasePhotos, setShowcasePhotos] = useState<any[]>([]);
 
   useEffect(() => {
     // Realtime database fetches
@@ -52,6 +53,10 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
     apiFetch("/api/members/alumni-of-the-week")
       .then(res => setAlumniOfWeek(res || null))
       .catch(() => setAlumniOfWeek(null));
+
+    apiFetch("/api/gallery/landing-page")
+      .then(res => setShowcasePhotos(Array.isArray(res) ? res : []))
+      .catch(() => setShowcasePhotos([]));
 
     if (isLoggedIn) {
       apiFetch("/api/members/directory?limit=4")
@@ -370,17 +375,32 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <p className="text-[var(--primary)] text-xs font-semibold tracking-widest uppercase mb-1">Memories</p>
+              <p className="text-[var(--primary)] text-xs font-semibold tracking-widest uppercase mb-1">Memories & Showcase</p>
               <h2 className="font-display text-3xl font-bold text-[var(--secondary)]">Photo Gallery</h2>
             </div>
             <button onClick={() => onNavigate("gallery")} className="text-sm text-[var(--primary)] hover:underline font-medium">View all</button>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-            {galleryImages.map((src, i) => (
-              <div key={i} onClick={() => onNavigate("gallery")} className="aspect-square overflow-hidden rounded-lg bg-[var(--muted)] cursor-pointer">
-                <img src={src} alt={`Alumni gallery ${i + 1}`} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
-              </div>
-            ))}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {showcasePhotos.length > 0 ? (
+              showcasePhotos.slice(0, 6).map((item, i) => {
+                const imgUrl = item.media?.secureUrl || galleryImages[i % galleryImages.length];
+                return (
+                  <div key={item.id || i} onClick={() => onNavigate("gallery")} className="group relative aspect-square overflow-hidden rounded-lg bg-[var(--muted)] cursor-pointer border border-[var(--border)] shadow-sm">
+                    <img src={imgUrl} alt={item.caption || `Gallery photo ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex flex-col justify-end p-2 text-white">
+                      <p className="text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity line-clamp-1">{item.album?.title || "Gallery Showcase"}</p>
+                      {item.caption && <p className="text-[9px] opacity-0 group-hover:opacity-90 transition-opacity line-clamp-1 italic">{item.caption}</p>}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              galleryImages.map((src, i) => (
+                <div key={i} onClick={() => onNavigate("gallery")} className="aspect-square overflow-hidden rounded-lg bg-[var(--muted)] cursor-pointer">
+                  <img src={src} alt={`Alumni gallery ${i + 1}`} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                </div>
+              ))
+            )}
           </div>
         </div>
       </section>

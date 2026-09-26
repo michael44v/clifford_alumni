@@ -18,6 +18,7 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
     profession: "",
     company: "",
     bio: "",
+    profilePhotoUrl: "",
   });
 
   const loadMemberData = async () => {
@@ -39,6 +40,7 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
           profession: meRes.profession || "",
           company: meRes.company || "",
           bio: meRes.bio || "",
+          profilePhotoUrl: meRes.profilePhoto?.secureUrl || "",
         });
       }
       setDues(Array.isArray(duesRes) ? duesRes : duesRes.data || []);
@@ -176,8 +178,8 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
         {activeTab === "profile" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="bg-white border border-[var(--border)] rounded p-5 text-center">
-              <div className="w-24 h-24 mx-auto rounded-full overflow-hidden border-2 border-[var(--primary)] mb-3">
-                <img src={profilePhoto} alt={memberName} className="w-full h-full object-cover" />
+              <div className="w-28 h-28 mx-auto rounded-full overflow-hidden border-2 border-[var(--primary)] mb-3 relative group">
+                <img src={profileForm.profilePhotoUrl || profilePhoto} alt={memberName} className="w-full h-full object-cover" />
               </div>
               <h3 className="font-semibold text-[var(--foreground)]">{memberName}</h3>
               <p className="text-xs text-[var(--primary)] font-medium mt-0.5">{setName} · {facName}</p>
@@ -187,6 +189,35 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
             <div className="lg:col-span-2 bg-white border border-[var(--border)] rounded p-5">
               <h3 className="font-semibold text-[var(--foreground)] mb-4">Edit Profile Information</h3>
               <form onSubmit={handleUpdateProfile} className="space-y-4">
+                <div className="p-3 bg-[var(--muted)] border border-[var(--border)] rounded text-xs space-y-2">
+                  <label className="block font-semibold text-[var(--foreground)]">Profile Picture</label>
+                  <div className="flex flex-col sm:flex-row gap-2 items-center">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setProfileForm({ ...profileForm, profilePhotoUrl: reader.result as string });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="text-xs w-full bg-white border p-1 rounded"
+                    />
+                    <span className="text-[10px] text-[var(--muted-foreground)] font-bold uppercase">or URL</span>
+                    <input
+                      type="text"
+                      placeholder="https://..."
+                      value={profileForm.profilePhotoUrl.startsWith("data:") ? "[File Selected]" : profileForm.profilePhotoUrl}
+                      onChange={e => setProfileForm({ ...profileForm, profilePhotoUrl: e.target.value })}
+                      className="text-xs p-1.5 border rounded w-full bg-white"
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">First Name</label>

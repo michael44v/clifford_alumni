@@ -151,6 +151,44 @@ router.post("/leadership", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", 
   }
 });
 
+// GET /api/admin/members/:id/details (Comprehensive Member Details for Admin)
+router.get("/members/:id/details", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "EXCO_ADMIN", "MODERATOR"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const memberId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const member = await prisma.member.findUnique({
+      where: { id: memberId },
+      include: {
+        graduatingSet: true,
+        faculty: true,
+        location: true,
+        profilePhoto: true,
+        galleryPhotosUploaded: {
+          orderBy: { createdAt: "desc" },
+          include: { media: true, album: true },
+        },
+        paymentRecords: {
+          orderBy: { createdAt: "desc" },
+          include: { duesItem: true, donationCampaign: true },
+        },
+        welfareRequests: {
+          orderBy: { createdAt: "desc" },
+        },
+        businessListings: true,
+      },
+    });
+
+    if (!member) {
+      return res.status(404).json({ error: "Member profile not found" });
+    }
+
+    const { passwordHash, ...safeMember } = member;
+    return res.json(safeMember);
+  } catch (err) {
+    console.error("Admin fetch member details error:", err);
+    return res.status(500).json({ error: "Failed to fetch member details" });
+  }
+});
+
 // GET /api/admin/members (View all alumni members)
 router.get("/members", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "EXCO_ADMIN", "MODERATOR"), async (req: AuthenticatedRequest, res: Response) => {
   try {

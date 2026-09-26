@@ -18,6 +18,7 @@ const updateProfileSchema = z.object({
   diasporaCountry: z.string().optional(),
   diasporaCity: z.string().optional(),
   profilePhotoMediaId: z.string().optional(),
+  profilePhotoUrl: z.string().optional(),
   privacySettings: z.record(z.boolean()).optional(),
 });
 
@@ -70,9 +71,22 @@ router.get("/me", authenticateJWT, async (req: AuthenticatedRequest, res: Respon
 // PUT /api/members/me
 router.put("/me", authenticateJWT, validateBody(updateProfileSchema), async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const { profilePhotoUrl, ...updateData } = req.body;
+
+    if (profilePhotoUrl) {
+      const media = await prisma.media.create({
+        data: {
+          cloudinaryPublicId: `avatar-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+          secureUrl: profilePhotoUrl,
+          folder: "avatars",
+        },
+      });
+      updateData.profilePhotoMediaId = media.id;
+    }
+
     const updatedMember = await prisma.member.update({
       where: { id: req.user!.userId },
-      data: req.body,
+      data: updateData,
       include: {
         graduatingSet: true,
         faculty: true,
@@ -84,6 +98,7 @@ router.put("/me", authenticateJWT, validateBody(updateProfileSchema), async (req
     const { passwordHash, ...safeMember } = updatedMember;
     return res.json(safeMember);
   } catch (err) {
+    console.error("Update profile error:", err);
     return res.status(500).json({ error: "Failed to update profile" });
   }
 });
