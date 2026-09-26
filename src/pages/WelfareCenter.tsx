@@ -11,9 +11,16 @@ export default function WelfareCenter({ onNavigate, isLoggedIn }: WelfareCenterP
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState<FormData>({ category: "MEDICAL_EMERGENCY", urgency: "MEDIUM", details: "", contact: "" });
 
+  const [error, setError] = useState("");
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
     if (!isLoggedIn) { onNavigate("login"); return; }
+    if (form.details.trim().length < 10) {
+      setError("Details of request must be at least 10 characters long.");
+      return;
+    }
     setLoading(true);
     try {
       await apiFetch("/api/welfare", {
@@ -21,12 +28,12 @@ export default function WelfareCenter({ onNavigate, isLoggedIn }: WelfareCenterP
         body: JSON.stringify({
           category: form.category,
           urgency: form.urgency.toUpperCase(),
-          description: form.details,
+          description: form.details.trim(),
         }),
       });
       setSubmitted(true);
     } catch (err: any) {
-      alert(err.message || "Failed to submit request");
+      setError(err.message || "Failed to submit request");
     } finally {
       setLoading(false);
     }
@@ -124,8 +131,22 @@ export default function WelfareCenter({ onNavigate, isLoggedIn }: WelfareCenterP
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1.5">Details of Request *</label>
-                  <textarea required rows={5} value={form.details} onChange={e => setForm({...form, details: e.target.value})} placeholder="Please describe your situation in detail. Include any relevant dates, amounts or circumstances. This information is strictly confidential." className="w-full px-3 py-2.5 border border-[var(--border)] rounded text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" />
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="block text-sm font-medium text-[var(--foreground)]">Details of Request *</label>
+                    <span className={`text-xs ${form.details.trim().length >= 10 ? "text-green-600 font-medium" : "text-red-500"}`}>
+                      {form.details.trim().length} / 10 min characters
+                    </span>
+                  </div>
+                  <textarea
+                    required
+                    minLength={10}
+                    rows={5}
+                    value={form.details}
+                    onChange={e => { setForm({...form, details: e.target.value}); setError(""); }}
+                    placeholder="Please describe your situation in detail (at least 10 characters). Include any relevant dates, amounts or circumstances. This information is strictly confidential."
+                    className={`w-full px-3 py-2.5 border rounded text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[var(--ring)] ${error ? "border-red-400 bg-red-50" : "border-[var(--border)]"}`}
+                  />
+                  {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[var(--foreground)] mb-1.5">Preferred Contact (optional)</label>

@@ -38,11 +38,11 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
   useEffect(() => {
     // Realtime database fetches
     apiFetch("/api/events")
-      .then(res => setEvents(Array.isArray(res) ? res : []))
+      .then(res => setEvents(Array.isArray(res) ? res : (res?.data || [])))
       .catch(() => setEvents([]));
 
     apiFetch("/api/news")
-      .then(res => setAnnouncements(Array.isArray(res) ? res : []))
+      .then(res => setAnnouncements(Array.isArray(res) ? res : (res?.data || [])))
       .catch(() => setAnnouncements([]));
 
     apiFetch("/api/admin/leadership")

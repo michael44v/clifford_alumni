@@ -15,6 +15,9 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [payments, setPayments] = useState<any[]>([]);
   const [faculties, setFaculties] = useState<any[]>([]);
   const [sets, setSets] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+  const [news, setNews] = useState<any[]>([]);
+  const [leadership, setLeadership] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Search/Filters
@@ -28,6 +31,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [showLeadershipModal, setShowLeadershipModal] = useState(false);
   const [showAOTWModal, setShowAOTWModal] = useState<any | null>(null);
   const [showRosterModal, setShowRosterModal] = useState(false);
+  const [showWelfareModal, setShowWelfareModal] = useState<any | null>(null);
 
   // Forms
   const [eventForm, setEventForm] = useState({ title: "", description: "", date: "", time: "", venue: "", category: "General", organizer: "CUAA" });
@@ -39,7 +43,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [statsRes, membersRes, rosterRes, welfareRes, paymentsRes, facultiesRes, setsRes] = await Promise.all([
+      const [statsRes, membersRes, rosterRes, welfareRes, paymentsRes, facultiesRes, setsRes, eventsRes, newsRes, leadershipRes] = await Promise.all([
         apiFetch("/api/admin/stats").catch(() => null),
         apiFetch(`/api/admin/members?search=${encodeURIComponent(memberSearch)}&status=${memberFilterStatus}`).catch(() => []),
         apiFetch(`/api/admin/official-directory?search=${encodeURIComponent(rosterSearch)}`).catch(() => []),
@@ -47,6 +51,9 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         apiFetch("/api/admin/payments").catch(() => []),
         apiFetch("/api/admin/faculties").catch(() => []),
         apiFetch("/api/admin/sets").catch(() => []),
+        apiFetch("/api/events?limit=50").catch(() => []),
+        apiFetch("/api/news?limit=50").catch(() => []),
+        apiFetch("/api/admin/leadership").catch(() => []),
       ]);
 
       if (statsRes) setAdminStats(statsRes);
@@ -56,6 +63,9 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setPayments(Array.isArray(paymentsRes) ? paymentsRes : []);
       setFaculties(Array.isArray(facultiesRes) ? facultiesRes : []);
       setSets(Array.isArray(setsRes) ? setsRes : []);
+      setEvents(Array.isArray(eventsRes) ? eventsRes : eventsRes?.data || []);
+      setNews(Array.isArray(newsRes) ? newsRes : newsRes?.data || []);
+      setLeadership(Array.isArray(leadershipRes) ? leadershipRes : []);
     } catch (err) {
       console.error("Admin fetchData error:", err);
     } finally {
@@ -116,6 +126,9 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         method: "PUT",
         body: JSON.stringify({ status }),
       });
+      if (showWelfareModal && showWelfareModal.id === id) {
+        setShowWelfareModal({ ...showWelfareModal, status });
+      }
       fetchData();
     } catch (err: any) {
       alert(err.message || "Failed to update welfare case status");
@@ -146,6 +159,16 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     }
   };
 
+  const handleDeleteEvent = async (id: string) => {
+    if (!confirm("Delete this event?")) return;
+    try {
+      await apiFetch(`/api/events/${id}`, { method: "DELETE" });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to delete event");
+    }
+  };
+
   const handleCreateNews = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -159,6 +182,16 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       fetchData();
     } catch (err: any) {
       alert(err.message || "Failed to post announcement");
+    }
+  };
+
+  const handleDeleteNews = async (id: string) => {
+    if (!confirm("Delete this announcement?")) return;
+    try {
+      await apiFetch(`/api/news/${id}`, { method: "DELETE" });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to delete announcement");
     }
   };
 
@@ -178,6 +211,16 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       fetchData();
     } catch (err: any) {
       alert(err.message || "Failed to create leadership profile");
+    }
+  };
+
+  const handleDeleteLeadership = async (id: string) => {
+    if (!confirm("Delete this leadership profile?")) return;
+    try {
+      await apiFetch(`/api/admin/leadership/${id}`, { method: "DELETE" });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to delete leadership profile");
     }
   };
 
@@ -462,7 +505,10 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         {activeTab === "welfare" && (
           <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
             <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
-              <h3 className="font-semibold text-sm">Welfare Requests</h3>
+              <div>
+                <h3 className="font-semibold text-sm">Welfare Requests</h3>
+                <p className="text-[11px] text-[var(--muted-foreground)]">Click any row to view full request details and member information.</p>
+              </div>
               <p className="text-xs text-[var(--muted-foreground)]">Total: {welfareCases.length}</p>
             </div>
             <div className="overflow-x-auto">
@@ -479,22 +525,16 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
                   {welfareCases.map(w => (
-                    <tr key={w.id} className="text-xs hover:bg-slate-50">
-                      <td className="p-3 font-medium">{w.member?.firstName} {w.member?.lastName}</td>
+                    <tr key={w.id} className="text-xs hover:bg-amber-50 cursor-pointer" onClick={() => setShowWelfareModal(w)}>
+                      <td className="p-3 font-medium text-[var(--primary)] underline">{w.member?.firstName} {w.member?.lastName}</td>
                       <td className="p-3">{w.category}</td>
                       <td className="p-3"><span className="font-semibold text-red-600">{w.urgency}</span></td>
                       <td className="p-3 max-w-xs truncate">{w.description}</td>
                       <td className="p-3">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">{w.status}</span>
                       </td>
-                      <td className="p-3">
-                        <select value={w.status} onChange={e => updateWelfareStatus(w.id, e.target.value)} className="px-2 py-1 border border-[var(--border)] rounded text-[10px]">
-                          <option value="NEW">NEW</option>
-                          <option value="PENDING">PENDING</option>
-                          <option value="IN_REVIEW">IN_REVIEW</option>
-                          <option value="RESOLVED">RESOLVED</option>
-                          <option value="REJECTED">REJECTED</option>
-                        </select>
+                      <td className="p-3" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => setShowWelfareModal(w)} className="px-2 py-1 bg-[var(--primary)] text-white rounded text-[10px] font-semibold">View Details</button>
                       </td>
                     </tr>
                   ))}
@@ -549,23 +589,87 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
 
         {/* Content Tab */}
         {activeTab === "content" && (
-          <div className="space-y-6">
+          <div className="space-y-8">
+            {/* Quick Create buttons */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <button onClick={() => setShowNewsModal(true)} className="p-5 bg-white border border-[var(--border)] rounded-lg hover:border-[var(--primary)] text-left">
+              <button onClick={() => setShowNewsModal(true)} className="p-5 bg-white border border-[var(--border)] rounded-lg hover:border-[var(--primary)] text-left shadow-sm">
                 <span className="text-3xl block mb-2">📣</span>
-                <h4 className="font-bold text-sm text-[var(--foreground)]">Post News / Announcement</h4>
-                <p className="text-xs text-[var(--muted-foreground)] mt-1">Publish to the homepage announcements feed</p>
+                <h4 className="font-bold text-sm text-[var(--foreground)]">+ Post Announcement</h4>
+                <p className="text-xs text-[var(--muted-foreground)] mt-1">Publish to homepage and news feed</p>
               </button>
-              <button onClick={() => setShowEventModal(true)} className="p-5 bg-white border border-[var(--border)] rounded-lg hover:border-[var(--primary)] text-left">
+              <button onClick={() => setShowEventModal(true)} className="p-5 bg-white border border-[var(--border)] rounded-lg hover:border-[var(--primary)] text-left shadow-sm">
                 <span className="text-3xl block mb-2">📅</span>
-                <h4 className="font-bold text-sm text-[var(--foreground)]">Create New Event</h4>
-                <p className="text-xs text-[var(--muted-foreground)] mt-1">Add events to the event calendar and homepage</p>
+                <h4 className="font-bold text-sm text-[var(--foreground)]">+ Create Event</h4>
+                <p className="text-xs text-[var(--muted-foreground)] mt-1">Add to event calendar and homepage</p>
               </button>
-              <button onClick={() => setShowLeadershipModal(true)} className="p-5 bg-white border border-[var(--border)] rounded-lg hover:border-[var(--primary)] text-left">
+              <button onClick={() => setShowLeadershipModal(true)} className="p-5 bg-white border border-[var(--border)] rounded-lg hover:border-[var(--primary)] text-left shadow-sm">
                 <span className="text-3xl block mb-2">🏛️</span>
-                <h4 className="font-bold text-sm text-[var(--foreground)]">Add EXCO Leader</h4>
-                <p className="text-xs text-[var(--muted-foreground)] mt-1">Add profiles to governing body list</p>
+                <h4 className="font-bold text-sm text-[var(--foreground)]">+ Add EXCO Leader</h4>
+                <p className="text-xs text-[var(--muted-foreground)] mt-1">Add profile to governing body</p>
               </button>
+            </div>
+
+            {/* List of Events */}
+            <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
+              <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
+                <h3 className="font-bold text-sm text-[var(--foreground)]">All Events ({events.length})</h3>
+                <button onClick={() => setShowEventModal(true)} className="px-3 py-1 bg-[var(--primary)] text-white rounded text-xs font-semibold">+ New Event</button>
+              </div>
+              <div className="divide-y divide-[var(--border)]">
+                {events.map((e) => (
+                  <div key={e.id} className="p-4 flex items-center justify-between gap-4 text-xs">
+                    <div>
+                      <p className="font-semibold text-sm text-[var(--foreground)]">{e.title}</p>
+                      <p className="text-[var(--muted-foreground)]">📅 {new Date(e.eventDate).toLocaleDateString()} at {e.time || '10:00 AM'} · 📍 {e.venue}</p>
+                      <p className="text-[var(--muted-foreground)] mt-0.5 line-clamp-1">{e.description}</p>
+                    </div>
+                    <button onClick={() => handleDeleteEvent(e.id)} className="px-3 py-1 bg-red-100 text-red-700 rounded font-semibold hover:bg-red-200">Delete</button>
+                  </div>
+                ))}
+                {events.length === 0 && <p className="p-5 text-center text-xs text-[var(--muted-foreground)]">No events created yet.</p>}
+              </div>
+            </div>
+
+            {/* List of News & Announcements */}
+            <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
+              <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
+                <h3 className="font-bold text-sm text-[var(--foreground)]">All News & Announcements ({news.length})</h3>
+                <button onClick={() => setShowNewsModal(true)} className="px-3 py-1 bg-[var(--primary)] text-white rounded text-xs font-semibold">+ New Announcement</button>
+              </div>
+              <div className="divide-y divide-[var(--border)]">
+                {news.map((n) => (
+                  <div key={n.id} className="p-4 flex items-center justify-between gap-4 text-xs">
+                    <div>
+                      <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--primary)] text-[10px] font-bold rounded mb-1 inline-block">{n.category?.replace('_', ' ')}</span>
+                      <p className="font-semibold text-sm text-[var(--foreground)]">{n.title}</p>
+                      <p className="text-[var(--muted-foreground)] line-clamp-2 mt-0.5">{n.content}</p>
+                    </div>
+                    <button onClick={() => handleDeleteNews(n.id)} className="px-3 py-1 bg-red-100 text-red-700 rounded font-semibold hover:bg-red-200">Delete</button>
+                  </div>
+                ))}
+                {news.length === 0 && <p className="p-5 text-center text-xs text-[var(--muted-foreground)]">No news or announcements created yet.</p>}
+              </div>
+            </div>
+
+            {/* List of EXCO Leadership */}
+            <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
+              <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
+                <h3 className="font-bold text-sm text-[var(--foreground)]">EXCO Leadership Governing Body ({leadership.length})</h3>
+                <button onClick={() => setShowLeadershipModal(true)} className="px-3 py-1 bg-[var(--primary)] text-white rounded text-xs font-semibold">+ Add Leader</button>
+              </div>
+              <div className="divide-y divide-[var(--border)]">
+                {leadership.map((l) => (
+                  <div key={l.id} className="p-4 flex items-center justify-between gap-4 text-xs">
+                    <div>
+                      <p className="font-semibold text-sm text-[var(--foreground)]">{l.name}</p>
+                      <p className="text-[var(--primary)] font-medium">{l.position} · Term Start: {l.termStart}</p>
+                      <p className="text-[var(--muted-foreground)] mt-0.5 line-clamp-1">{l.biography}</p>
+                    </div>
+                    <button onClick={() => handleDeleteLeadership(l.id)} className="px-3 py-1 bg-red-100 text-red-700 rounded font-semibold hover:bg-red-200">Delete</button>
+                  </div>
+                ))}
+                {leadership.length === 0 && <p className="p-5 text-center text-xs text-[var(--muted-foreground)]">No leadership profiles created yet.</p>}
+              </div>
             </div>
           </div>
         )}
@@ -580,6 +684,51 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
           </div>
         )}
       </div>
+
+      {/* Welfare Detail Modal */}
+      {showWelfareModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowWelfareModal(null)}>
+          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-start border-b border-[var(--border)] pb-3">
+              <div>
+                <span className="text-[10px] font-mono text-[var(--muted-foreground)]">CASE ID: {showWelfareModal.id}</span>
+                <h3 className="font-bold text-lg text-[var(--secondary)]">Welfare Request Details</h3>
+              </div>
+              <button onClick={() => setShowWelfareModal(null)} className="text-gray-400 hover:text-gray-600 font-bold">✕</button>
+            </div>
+
+            <div className="bg-[var(--muted)] rounded-lg p-3 text-xs space-y-1">
+              <p><strong className="text-[var(--foreground)]">Member:</strong> {showWelfareModal.member?.firstName} {showWelfareModal.member?.lastName}</p>
+              <p><strong className="text-[var(--foreground)]">Email:</strong> {showWelfareModal.member?.email || 'N/A'}</p>
+              <p><strong className="text-[var(--foreground)]">Phone:</strong> {showWelfareModal.member?.phone || 'N/A'}</p>
+              <p><strong className="text-[var(--foreground)]">Category:</strong> {showWelfareModal.category}</p>
+              <p><strong className="text-[var(--foreground)]">Urgency:</strong> <span className="font-bold text-red-600">{showWelfareModal.urgency}</span></p>
+              <p><strong className="text-[var(--foreground)]">Submitted:</strong> {new Date(showWelfareModal.createdAt).toLocaleString()}</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold mb-1 text-[var(--foreground)]">Full Request Content / Description:</label>
+              <div className="p-3 bg-slate-50 border border-[var(--border)] rounded text-xs leading-relaxed text-[var(--foreground)] whitespace-pre-wrap">
+                {showWelfareModal.description}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium">Update Status:</span>
+                <select value={showWelfareModal.status} onChange={e => updateWelfareStatus(showWelfareModal.id, e.target.value)} className="px-2 py-1 border border-[var(--border)] rounded text-xs bg-white font-semibold">
+                  <option value="NEW">NEW</option>
+                  <option value="PENDING">PENDING</option>
+                  <option value="IN_REVIEW">IN_REVIEW</option>
+                  <option value="RESOLVED">RESOLVED</option>
+                  <option value="REJECTED">REJECTED</option>
+                </select>
+              </div>
+              <button onClick={() => setShowWelfareModal(null)} className="px-4 py-1.5 bg-[var(--primary)] text-white rounded text-xs font-semibold">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Roster Entry Modal */}
       {showRosterModal && (
