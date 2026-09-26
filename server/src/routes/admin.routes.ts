@@ -142,4 +142,137 @@ router.post("/leadership", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", 
   }
 });
 
+// GET /api/admin/members (View all alumni members)
+router.get("/members", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "EXCO_ADMIN", "MODERATOR"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const search = (req.query.search as string) || "";
+    const status = (req.query.status as string) || "";
+
+    const whereClause: any = { deletedAt: null };
+    if (status) {
+      whereClause.verificationStatus = status;
+    }
+    if (search) {
+      whereClause.OR = [
+        { firstName: { contains: search, mode: "insensitive" } },
+        { lastName: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+        { matricNumber: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    const members = await prisma.member.findMany({
+      where: whereClause,
+      include: {
+        graduatingSet: true,
+        faculty: true,
+        location: true,
+        profilePhoto: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const safeMembers = members.map(({ passwordHash, ...m }) => m);
+    return res.json(safeMembers);
+  } catch (err) {
+    console.error("Admin fetch members error:", err);
+    return res.status(500).json({ error: "Failed to fetch members" });
+  }
+});
+
+// PUT /api/admin/members/:id (Modify member status, role, or details)
+router.put("/members/:id", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "EXCO_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const memberId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const { verificationStatus, role, firstName, lastName, email, phone, profession, company } = req.body;
+
+    const updated = await prisma.member.update({
+      where: { id: memberId },
+      data: {
+        ...(verificationStatus && { verificationStatus }),
+        ...(role && { role }),
+        ...(firstName && { firstName }),
+        ...(lastName && { lastName }),
+        ...(email && { email }),
+        ...(phone && { phone }),
+        ...(profession && { profession }),
+        ...(company && { company }),
+      },
+      include: {
+        graduatingSet: true,
+        faculty: true,
+      },
+    });
+
+    const { passwordHash, ...safeMember } = updated;
+    return res.json(safeMember);
+  } catch (err) {
+    console.error("Admin update member error:", err);
+    return res.status(500).json({ error: "Failed to update member" });
+  }
+});
+
+// PUT /api/admin/members/:id/alumni-of-the-week (Set or unset Alumni of the Week)
+router.put("/members/:id/alumni-of-the-week", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "CONTENT_ADMIN", "EXCO_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const memberId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const { isAlumniOfWeek, alumniOfWeekBio } = req.body;
+
+    if (isAlumniOfWeek) {
+      // Clear previous alumni of the week
+      await prisma.member.updateMany({
+        where: { isAlumniOfWeek: true },
+        data: { isAlumniOfWeek: false },
+      });
+    }
+
+    const updated = await prisma.member.update({
+      where: { id: memberId },
+      data: {
+        isAlumniOfWeek: !!isAlumniOfWeek,
+        alumniOfWeekBio: alumniOfWeekBio || null,
+      },
+      include: {
+        graduatingSet: true,
+        faculty: true,
+        profilePhoto: true,
+      },
+    });
+
+    const { passwordHash, ...safeMember } = updated;
+    return res.json(safeMember);
+  } catch (err) {
+    console.error("Set Alumni of the Week error:", err);
+    return res.status(500).json({ error: "Failed to update Alumni of the Week" });
+  }
+});
+
+// GET /api/admin/payments (All payment records)
+router.get("/payments", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "FINANCE_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const payments = await prisma.paymentRecord.findMany({
+      include: {
+        member: { select: { firstName: true, lastName: true, email: true } },
+        duesItem: { select: { title: true } },
+        donationCampaign: { select: { title: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return res.json(payments);
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to fetch payments" });
+  }
+});
+
+// DELETE /api/admin/leadership/:id
+router.delete("/leadership/:id", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "CONTENT_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    await prisma.leadershipProfile.delete({ where: { id } });
+    return res.json({ message: "Leadership profile removed" });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to delete leadership profile" });
+  }
+});
+
 export default router;

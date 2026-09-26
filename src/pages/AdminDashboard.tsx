@@ -6,82 +6,206 @@ interface AdminDashboardProps { onNavigate: (page: Page) => void; onLogout: () =
 
 type AdminTab = "overview" | "members" | "welfare" | "payments" | "content" | "settings";
 
-const pendingMembers = [
-  { name: "Chukwudi Nnaji", email: "chukwudi@email.com", gradYear: "2015", faculty: "Engineering", submitted: "Nov 28, 2024" },
-  { name: "Blessing Okonkwo", email: "blessing@email.com", gradYear: "2012", faculty: "Law", submitted: "Nov 27, 2024" },
-  { name: "Tolu Adeyemi", email: "tolu@email.com", gradYear: "2018", faculty: "Medicine", submitted: "Nov 26, 2024" },
-  { name: "Nnamdi Okeke", email: "nnamdi@email.com", gradYear: "2009", faculty: "Business Admin", submitted: "Nov 25, 2024" },
-  { name: "Chiamaka Uche", email: "chiamaka@email.com", gradYear: "2020", faculty: "Science", submitted: "Nov 24, 2024" },
-];
-
-const welfareCases = [
-  { id: "WLF-2024-041", member: "Emeka Obi (Set 2007)", category: "Medical Emergency", status: "Urgent", officer: "Miss Adaeze Okafor", date: "Nov 29, 2024" },
-  { id: "WLF-2024-040", member: "Sarah Eze (Set 2010)", category: "Bereavement Support", status: "Active", officer: "Miss Adaeze Okafor", date: "Nov 27, 2024" },
-  { id: "WLF-2024-039", member: "Kelechi Nwosu (Set 2013)", category: "Financial Distress", status: "Pending", officer: "Unassigned", date: "Nov 25, 2024" },
-  { id: "WLF-2024-038", member: "Amara Igwe (Set 2008)", category: "Emergency Assistance", status: "Resolved", officer: "Miss Adaeze Okafor", date: "Nov 20, 2024" },
-];
-
-const recentPayments = [
-  { name: "Adaeze Nwachukwu", type: "Annual Dues 2025", amount: 5000, date: "Nov 28" },
-  { name: "Emeka Okafor", type: "Welfare Donation", amount: 20000, date: "Nov 27" },
-  { name: "Ngozi Eze", type: "AGM Registration", amount: 2000, date: "Nov 27" },
-  { name: "Chidi Obiora", type: "Annual Dues 2025", amount: 5000, date: "Nov 26" },
-  { name: "Kayode Fashola", type: "Scholarship Fund", amount: 50000, date: "Nov 25" },
-];
-
 export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const [adminStats, setAdminStats] = useState<any | null>(null);
+  const [members, setMembers] = useState<any[]>([]);
+  const [welfareCases, setWelfareCases] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [memberStatuses, setMemberStatuses] = useState<Record<number, string>>({});
+  const [memberSearch, setMemberSearch] = useState("");
+  const [memberFilterStatus, setMemberFilterStatus] = useState("");
+
+  // Modals state
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [showNewsModal, setShowNewsModal] = useState(false);
+  const [showLeadershipModal, setShowLeadershipModal] = useState(false);
+  const [showAOTWModal, setShowAOTWModal] = useState<any | null>(null);
+
+  // Forms
+  const [eventForm, setEventForm] = useState({ title: "", description: "", date: "", time: "", venue: "", category: "General", organizer: "CUAA" });
+  const [newsForm, setNewsForm] = useState({ title: "", content: "", category: "OFFICIAL_ANNOUNCEMENT" });
+  const [leadershipForm, setLeadershipForm] = useState({ name: "", position: "", biography: "", termStart: new Date().getFullYear() });
+  const [aotwBio, setAotwBio] = useState("");
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const stats = await apiFetch("/api/admin/stats");
+      setAdminStats(stats);
+
+      const membersRes = await apiFetch(`/api/admin/members?search=${encodeURIComponent(memberSearch)}&status=${memberFilterStatus}`);
+      setMembers(Array.isArray(membersRes) ? membersRes : []);
+
+      const welfareRes = await apiFetch("/api/welfare/admin/cases");
+      setWelfareCases(Array.isArray(welfareRes) ? welfareRes : []);
+
+      const paymentsRes = await apiFetch("/api/admin/payments");
+      setPayments(Array.isArray(paymentsRes) ? paymentsRes : []);
+    } catch (err) {
+      console.error("Admin fetchData error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    setLoading(true);
-    apiFetch("/api/admin/stats")
-      .then(res => setAdminStats(res))
-      .catch(err => console.error(err))
-      .finally(() => setLoading(false));
-  }, []);
+    fetchData();
+  }, [memberSearch, memberFilterStatus]);
+
+  const updateMemberStatus = async (id: string, verificationStatus: string) => {
+    try {
+      await apiFetch(`/api/admin/members/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ verificationStatus }),
+      });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to update member status");
+    }
+  };
+
+  const handleSetAlumniOfWeek = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!showAOTWModal) return;
+    try {
+      await apiFetch(`/api/admin/members/${showAOTWModal.id}/alumni-of-the-week`, {
+        method: "PUT",
+        body: JSON.stringify({
+          isAlumniOfWeek: true,
+          alumniOfWeekBio: aotwBio,
+        }),
+      });
+      alert(`Set ${showAOTWModal.firstName} ${showAOTWModal.lastName} as Alumni of the Week!`);
+      setShowAOTWModal(null);
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to set Alumni of the Week");
+    }
+  };
+
+  const handleUnsetAlumniOfWeek = async (m: any) => {
+    try {
+      await apiFetch(`/api/admin/members/${m.id}/alumni-of-the-week`, {
+        method: "PUT",
+        body: JSON.stringify({ isAlumniOfWeek: false }),
+      });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to unset Alumni of the Week");
+    }
+  };
+
+  const updateWelfareStatus = async (id: string, status: string) => {
+    try {
+      await apiFetch(`/api/welfare/admin/cases/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ status }),
+      });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to update welfare case status");
+    }
+  };
+
+  const handleCreateEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await apiFetch("/api/events", {
+        method: "POST",
+        body: JSON.stringify({
+          title: eventForm.title,
+          description: eventForm.description,
+          eventDate: new Date(eventForm.date).toISOString(),
+          time: eventForm.time || "10:00 AM",
+          venue: eventForm.venue,
+          category: eventForm.category,
+          organizer: eventForm.organizer,
+        }),
+      });
+      alert("Event created successfully!");
+      setShowEventModal(false);
+      setEventForm({ title: "", description: "", date: "", time: "", venue: "", category: "General", organizer: "CUAA" });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to create event");
+    }
+  };
+
+  const handleCreateNews = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await apiFetch("/api/news", {
+        method: "POST",
+        body: JSON.stringify(newsForm),
+      });
+      alert("Announcement posted successfully!");
+      setShowNewsModal(false);
+      setNewsForm({ title: "", content: "", category: "OFFICIAL_ANNOUNCEMENT" });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to post announcement");
+    }
+  };
+
+  const handleCreateLeadership = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await apiFetch("/api/admin/leadership", {
+        method: "POST",
+        body: JSON.stringify({
+          ...leadershipForm,
+          termStart: Number(leadershipForm.termStart),
+        }),
+      });
+      alert("EXCO leadership profile added!");
+      setShowLeadershipModal(false);
+      setLeadershipForm({ name: "", position: "", biography: "", termStart: new Date().getFullYear() });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to create leadership profile");
+    }
+  };
 
   const stats = [
-    { label: "Total Alumni", value: adminStats?.totalMembers || "0", change: "All registered", color: "text-[var(--secondary)]" },
-    { label: "Verified Members", value: adminStats?.verifiedMembers || "0", change: "Verified status", color: "text-green-600" },
-    { label: "Pending Verification", value: adminStats?.pendingVerifications || "0", change: "Awaiting review", color: "text-amber-600" },
-    { label: "Welfare Cases", value: adminStats?.activeWelfareCases || "0", change: "Active requests", color: "text-red-600" },
-    { label: "Total Dues (₦)", value: `₦${Number(adminStats?.financials?.totalDuesCollected || 0).toLocaleString()}`, change: "Collected", color: "text-[var(--primary)]" },
-    { label: "Total Donations (₦)", value: `₦${Number(adminStats?.financials?.totalDonationsCollected || 0).toLocaleString()}`, change: "Collected", color: "text-blue-600" },
+    { label: "Total Alumni", value: adminStats?.totalMembers || members.length || "0", color: "text-[var(--secondary)]" },
+    { label: "Verified Members", value: adminStats?.verifiedMembers || members.filter(m => m.verificationStatus === "VERIFIED").length || "0", color: "text-green-600" },
+    { label: "Pending Verification", value: adminStats?.pendingVerifications || members.filter(m => m.verificationStatus === "PENDING").length || "0", color: "text-amber-600" },
+    { label: "Welfare Cases", value: adminStats?.activeWelfareCases || welfareCases.filter(w => w.status !== "RESOLVED").length || "0", color: "text-red-600" },
+    { label: "Total Dues (₦)", value: `₦${Number(adminStats?.financials?.totalDuesCollected || 0).toLocaleString()}`, color: "text-[var(--primary)]" },
+    { label: "Total Payments", value: payments.length || "0", color: "text-blue-600" },
   ];
 
-  const approveMember = (i: number) => setMemberStatuses(s => ({...s, [i]: "approved"}));
-  const rejectMember = (i: number) => setMemberStatuses(s => ({...s, [i]: "rejected"}));
+  const pendingMembers = members.filter(m => m.verificationStatus === "PENDING");
 
   return (
     <div className="bg-[var(--muted)] min-h-screen">
-      {/* Admin header */}
+      {/* Header */}
       <div className="bg-[var(--secondary)] border-b border-black/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div>
-            <p className="text-[var(--accent)] text-[10px] font-bold uppercase tracking-widest">CUAA</p>
+            <p className="text-[var(--accent)] text-[10px] font-bold uppercase tracking-widest">CUAA Realtime Admin</p>
             <h1 className="font-display text-xl font-bold text-white">Admin Dashboard</h1>
           </div>
           <div className="flex gap-2">
-            <button onClick={() => onNavigate("home")} className="px-3 py-1.5 text-xs text-white/70 hover:text-white border border-white/20 rounded">View Site</button>
-            <button onClick={onLogout} className="px-3 py-1.5 text-xs text-white/70 hover:text-white border border-white/20 rounded">Sign Out</button>
+            <button onClick={fetchData} className="px-3 py-1.5 text-xs text-white/80 hover:text-white border border-white/20 rounded">🔄 Refresh</button>
+            <button onClick={() => onNavigate("home")} className="px-3 py-1.5 text-xs text-white/80 hover:text-white border border-white/20 rounded">View Site</button>
+            <button onClick={onLogout} className="px-3 py-1.5 text-xs text-white/80 hover:text-white border border-white/20 rounded">Sign Out</button>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Admin nav */}
+        {/* Navigation Tabs */}
         <div className="flex overflow-x-auto gap-1 bg-white border border-[var(--border)] p-1 rounded mb-6">
           {(["overview", "members", "welfare", "payments", "content", "settings"] as AdminTab[]).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-shrink-0 px-4 py-2 rounded text-xs font-medium capitalize whitespace-nowrap transition-colors ${activeTab === tab ? "bg-[var(--secondary)] text-white" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}>
-              {tab}
+              {tab} {tab === "members" && pendingMembers.length > 0 ? `(${pendingMembers.length})` : ""}
             </button>
           ))}
         </div>
 
-        {/* Overview */}
+        {/* Overview Tab */}
         {activeTab === "overview" && (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
@@ -89,7 +213,6 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                 <div key={s.label} className="bg-white border border-[var(--border)] rounded p-4 text-center">
                   <p className={`font-display text-xl font-bold ${s.color}`}>{s.value}</p>
                   <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5 leading-tight">{s.label}</p>
-                  <p className="text-[10px] text-[var(--muted-foreground)] mt-1 opacity-70">{s.change}</p>
                 </div>
               ))}
             </div>
@@ -101,284 +224,390 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                   <h3 className="font-semibold text-[var(--foreground)]">Pending Verifications</h3>
                   <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-bold rounded">{pendingMembers.length}</span>
                 </div>
-                <div className="divide-y divide-[var(--border)]">
-                  {pendingMembers.slice(0, 3).map((m, i) => (
-                    <div key={i} className="px-5 py-3 flex items-center gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-[var(--foreground)] truncate">{m.name}</p>
-                        <p className="text-xs text-[var(--muted-foreground)]">Set {m.gradYear} · {m.faculty}</p>
-                      </div>
-                      {memberStatuses[i] ? (
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded ${memberStatuses[i] === "approved" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                          {memberStatuses[i] === "approved" ? "Approved" : "Rejected"}
-                        </span>
-                      ) : (
-                        <div className="flex gap-1.5">
-                          <button onClick={() => approveMember(i)} className="px-2.5 py-1 bg-green-600 text-white rounded text-xs font-semibold hover:bg-green-700 transition-colors">✓</button>
-                          <button onClick={() => rejectMember(i)} className="px-2.5 py-1 bg-red-500 text-white rounded text-xs font-semibold hover:bg-red-600 transition-colors">✕</button>
+                {pendingMembers.length > 0 ? (
+                  <div className="divide-y divide-[var(--border)]">
+                    {pendingMembers.slice(0, 4).map((m) => (
+                      <div key={m.id} className="px-5 py-3 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-[var(--foreground)] truncate">{m.firstName} {m.lastName}</p>
+                          <p className="text-xs text-[var(--muted-foreground)]">{m.email} · {m.graduatingSet?.setName || "Alumni"}</p>
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <div className="px-5 py-3 border-t border-[var(--border)]">
-                  <button onClick={() => setActiveTab("members")} className="text-xs text-[var(--primary)] hover:underline">View all {pendingMembers.length} pending →</button>
-                </div>
-              </div>
-
-              {/* Recent payments */}
-              <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
-                <div className="px-5 py-4 border-b border-[var(--border)]">
-                  <h3 className="font-semibold text-[var(--foreground)]">Recent Payments</h3>
-                </div>
-                <div className="divide-y divide-[var(--border)]">
-                  {recentPayments.map((p, i) => (
-                    <div key={i} className="px-5 py-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-[var(--foreground)]">{p.name}</p>
-                        <p className="text-xs text-[var(--muted-foreground)]">{p.type} · {p.date}</p>
+                        <div className="flex gap-1.5 flex-shrink-0">
+                          <button onClick={() => updateMemberStatus(m.id, "VERIFIED")} className="px-2.5 py-1 bg-green-600 text-white rounded text-xs font-semibold hover:bg-green-700">Approve</button>
+                          <button onClick={() => updateMemberStatus(m.id, "SUSPENDED")} className="px-2.5 py-1 bg-red-500 text-white rounded text-xs font-semibold hover:bg-red-600">Reject</button>
+                        </div>
                       </div>
-                      <span className="text-sm font-bold text-green-600">₦{p.amount.toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-6 text-center text-xs text-[var(--muted-foreground)]">No pending verifications.</div>
+                )}
                 <div className="px-5 py-3 border-t border-[var(--border)]">
-                  <button onClick={() => setActiveTab("payments")} className="text-xs text-[var(--primary)] hover:underline">View all payments →</button>
+                  <button onClick={() => setActiveTab("members")} className="text-xs text-[var(--primary)] hover:underline">View all members ({members.length}) →</button>
                 </div>
               </div>
 
-              {/* Welfare summary */}
-              <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
-                <div className="px-5 py-4 border-b border-[var(--border)]">
-                  <h3 className="font-semibold text-[var(--foreground)]">Active Welfare Cases</h3>
-                </div>
-                <div className="divide-y divide-[var(--border)]">
-                  {welfareCases.filter(w => w.status !== "Resolved").map((w) => (
-                    <div key={w.id} className="px-5 py-3">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <p className="text-sm font-medium text-[var(--foreground)]">{w.member}</p>
-                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${w.status === "Urgent" ? "bg-red-100 text-red-700" : w.status === "Active" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>{w.status}</span>
-                      </div>
-                      <p className="text-xs text-[var(--muted-foreground)]">{w.category} · {w.id}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="px-5 py-3 border-t border-[var(--border)]">
-                  <button onClick={() => setActiveTab("welfare")} className="text-xs text-[var(--primary)] hover:underline">Manage welfare cases →</button>
-                </div>
-              </div>
-
-              {/* Quick admin actions */}
+              {/* Quick Actions */}
               <div className="bg-white border border-[var(--border)] rounded p-5">
-                <h3 className="font-semibold text-[var(--foreground)] mb-4">Admin Actions</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { icon: "📣", label: "Post Announcement" },
-                    { icon: "📅", label: "Create Event" },
-                    { icon: "📸", label: "Add to Gallery" },
-                    { icon: "💼", label: "Approve Job Post" },
-                    { icon: "📊", label: "Export Reports" },
-                    { icon: "✉️", label: "Send Notification" },
-                  ].map(({ icon, label }) => (
-                    <button key={label} className="flex items-center gap-2 px-3 py-2.5 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors">
-                      {icon} {label}
-                    </button>
-                  ))}
+                <h3 className="font-semibold text-[var(--foreground)] mb-4">Realtime Control Actions</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => setShowNewsModal(true)} className="p-3 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] text-left">
+                    <span className="text-lg block mb-1">📣</span>
+                    <strong>Post Announcement</strong>
+                    <p className="text-[10px] text-[var(--muted-foreground)]">Publish news to Home page</p>
+                  </button>
+                  <button onClick={() => setShowEventModal(true)} className="p-3 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] text-left">
+                    <span className="text-lg block mb-1">📅</span>
+                    <strong>Create Event</strong>
+                    <p className="text-[10px] text-[var(--muted-foreground)]">Schedule upcoming event</p>
+                  </button>
+                  <button onClick={() => setShowLeadershipModal(true)} className="p-3 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] text-left">
+                    <span className="text-lg block mb-1">🏛️</span>
+                    <strong>Add EXCO Leader</strong>
+                    <p className="text-[10px] text-[var(--muted-foreground)]">Update governing body</p>
+                  </button>
+                  <button onClick={() => setActiveTab("members")} className="p-3 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] text-left">
+                    <span className="text-lg block mb-1">🏆</span>
+                    <strong>Alumni of the Week</strong>
+                    <p className="text-[10px] text-[var(--muted-foreground)]">Select member recognition</p>
+                  </button>
                 </div>
               </div>
             </div>
           </>
         )}
 
-        {/* Members tab */}
+        {/* Members Tab */}
         {activeTab === "members" && (
           <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
-            <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
-              <h3 className="font-semibold">Member Management — Pending Verification</h3>
-              <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-bold rounded">{pendingMembers.length} pending</span>
+            <div className="p-4 border-b border-[var(--border)] flex flex-col sm:flex-row gap-3 items-center justify-between">
+              <div className="flex gap-2 w-full sm:w-auto">
+                <input
+                  type="text"
+                  placeholder="Search alumni by name, email, matric..."
+                  value={memberSearch}
+                  onChange={e => setMemberSearch(e.target.value)}
+                  className="px-3 py-1.5 border border-[var(--border)] rounded text-xs w-full sm:w-64"
+                />
+                <select value={memberFilterStatus} onChange={e => setMemberFilterStatus(e.target.value)} className="px-3 py-1.5 border border-[var(--border)] rounded text-xs">
+                  <option value="">All Statuses</option>
+                  <option value="VERIFIED">VERIFIED</option>
+                  <option value="PENDING">PENDING</option>
+                  <option value="SUSPENDED">SUSPENDED</option>
+                </select>
+              </div>
+              <p className="text-xs text-[var(--muted-foreground)]">Total: <strong>{members.length}</strong> members</p>
             </div>
+
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
-                    {["Name", "Email", "Grad Year", "Faculty", "Submitted", "Action"].map(h => (
-                      <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide whitespace-nowrap">{h}</th>
-                    ))}
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Name</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Email / Phone</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Matric / Type</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Status</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Alumni of Week</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {pendingMembers.map((m, i) => (
-                    <tr key={i} className="border-b border-[var(--border)] last:border-0">
-                      <td className="px-5 py-3 text-sm font-medium text-[var(--foreground)]">{m.name}</td>
-                      <td className="px-5 py-3 text-sm text-[var(--muted-foreground)]">{m.email}</td>
-                      <td className="px-5 py-3 text-sm text-[var(--muted-foreground)]">{m.gradYear}</td>
-                      <td className="px-5 py-3 text-sm text-[var(--muted-foreground)]">{m.faculty}</td>
-                      <td className="px-5 py-3 text-sm text-[var(--muted-foreground)] whitespace-nowrap">{m.submitted}</td>
-                      <td className="px-5 py-3">
-                        {memberStatuses[i] ? (
-                          <span className={`text-xs font-semibold px-2 py-1 rounded ${memberStatuses[i] === "approved" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                            {memberStatuses[i] === "approved" ? "✓ Approved" : "✕ Rejected"}
-                          </span>
-                        ) : (
-                          <div className="flex gap-1.5">
-                            <button onClick={() => approveMember(i)} className="px-3 py-1 bg-green-600 text-white rounded text-xs font-semibold hover:bg-green-700 transition-colors">Approve</button>
-                            <button onClick={() => rejectMember(i)} className="px-3 py-1 bg-red-500 text-white rounded text-xs font-semibold hover:bg-red-600 transition-colors">Reject</button>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {members.map(m => (
+                    <tr key={m.id} className="text-xs hover:bg-slate-50">
+                      <td className="p-3 font-medium text-[var(--foreground)]">{m.firstName} {m.lastName}</td>
+                      <td className="p-3 text-[var(--muted-foreground)]">{m.email}<br />{m.phone || '—'}</td>
+                      <td className="p-3 text-[var(--muted-foreground)]">{m.matricNumber || 'N/A'}<br /><span className="text-[10px] font-semibold">{m.memberType}</span></td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${m.verificationStatus === "VERIFIED" ? "bg-green-100 text-green-700" : m.verificationStatus === "PENDING" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
+                          {m.verificationStatus}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        {m.isAlumniOfWeek ? (
+                          <div className="flex items-center gap-1 text-amber-600 font-bold">
+                            <span>🏆 Active</span>
+                            <button onClick={() => handleUnsetAlumniOfWeek(m)} className="text-[10px] text-red-500 underline ml-1">Remove</button>
                           </div>
+                        ) : (
+                          <button onClick={() => { setShowAOTWModal(m); setAotwBio(m.alumniOfWeekBio || m.bio || ""); }} className="px-2 py-1 bg-amber-50 border border-amber-300 text-amber-800 rounded text-[10px] font-semibold hover:bg-amber-100">
+                            Set as AOTW
+                          </button>
                         )}
                       </td>
+                      <td className="p-3">
+                        <div className="flex gap-1">
+                          {m.verificationStatus !== "VERIFIED" && (
+                            <button onClick={() => updateMemberStatus(m.id, "VERIFIED")} className="px-2 py-1 bg-green-600 text-white rounded text-[10px] font-semibold hover:bg-green-700">Approve</button>
+                          )}
+                          {m.verificationStatus !== "SUSPENDED" && (
+                            <button onClick={() => updateMemberStatus(m.id, "SUSPENDED")} className="px-2 py-1 bg-red-500 text-white rounded text-[10px] font-semibold hover:bg-red-600">Suspend</button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
+                  {members.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-6 text-center text-xs text-[var(--muted-foreground)]">No members found matching filter.</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
-        {/* Welfare tab */}
+        {/* Welfare Tab */}
         {activeTab === "welfare" && (
           <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
-            <div className="px-5 py-4 border-b border-[var(--border)]">
-              <h3 className="font-semibold">Welfare Case Management</h3>
+            <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
+              <h3 className="font-semibold text-sm">Welfare Requests</h3>
+              <p className="text-xs text-[var(--muted-foreground)]">Total: {welfareCases.length}</p>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
-                    {["Case ID", "Member", "Category", "Status", "Officer", "Date", "Action"].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide whitespace-nowrap">{h}</th>
-                    ))}
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Member</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Category</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Urgency</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Description</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Status</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {welfareCases.map((w) => (
-                    <tr key={w.id} className="border-b border-[var(--border)] last:border-0">
-                      <td className="px-4 py-3 text-xs font-mono text-[var(--muted-foreground)]">{w.id}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-[var(--foreground)]">{w.member}</td>
-                      <td className="px-4 py-3 text-sm text-[var(--muted-foreground)]">{w.category}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${w.status === "Urgent" ? "bg-red-100 text-red-700" : w.status === "Active" ? "bg-blue-100 text-blue-700" : w.status === "Pending" ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>{w.status}</span>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {welfareCases.map(w => (
+                    <tr key={w.id} className="text-xs hover:bg-slate-50">
+                      <td className="p-3 font-medium">{w.member?.firstName} {w.member?.lastName}</td>
+                      <td className="p-3">{w.category}</td>
+                      <td className="p-3"><span className="font-semibold text-red-600">{w.urgency}</span></td>
+                      <td className="p-3 max-w-xs truncate">{w.description}</td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">{w.status}</span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-[var(--muted-foreground)]">{w.officer}</td>
-                      <td className="px-4 py-3 text-sm text-[var(--muted-foreground)] whitespace-nowrap">{w.date}</td>
-                      <td className="px-4 py-3">
-                        <button className="text-xs text-[var(--primary)] hover:underline">Review</button>
+                      <td className="p-3">
+                        <select value={w.status} onChange={e => updateWelfareStatus(w.id, e.target.value)} className="px-2 py-1 border border-[var(--border)] rounded text-[10px]">
+                          <option value="NEW">NEW</option>
+                          <option value="PENDING">PENDING</option>
+                          <option value="IN_REVIEW">IN_REVIEW</option>
+                          <option value="RESOLVED">RESOLVED</option>
+                          <option value="REJECTED">REJECTED</option>
+                        </select>
                       </td>
                     </tr>
                   ))}
+                  {welfareCases.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-6 text-center text-xs text-[var(--muted-foreground)]">No welfare requests found.</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
-        {/* Payments tab */}
+        {/* Payments Tab */}
         {activeTab === "payments" && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {[
-                { label: "Total Collected (2024)", value: "₦6.35M", bg: "bg-green-50 border-green-200" },
-                { label: "Annual Dues Paid", value: "2,841", bg: "bg-blue-50 border-blue-200" },
-                { label: "Pending Dues", value: "301", bg: "bg-amber-50 border-amber-200" },
-                { label: "Total Donations", value: "₦2.1M", bg: "bg-purple-50 border-purple-200" },
-              ].map(({ label, value, bg }) => (
-                <div key={label} className={`border rounded p-4 text-center ${bg}`}>
-                  <p className="font-display text-xl font-bold text-[var(--secondary)]">{value}</p>
-                  <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{label}</p>
-                </div>
-              ))}
+          <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
+            <div className="p-4 border-b border-[var(--border)]">
+              <h3 className="font-semibold text-sm">Realtime Transactions</h3>
             </div>
-            <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
-              <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
-                <h3 className="font-semibold">Recent Transactions</h3>
-                <button className="text-xs text-[var(--primary)] hover:underline">Export CSV</button>
-              </div>
-              <div className="divide-y divide-[var(--border)]">
-                {recentPayments.map((p, i) => (
-                  <div key={i} className="px-5 py-3 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-[var(--foreground)]">{p.name}</p>
-                      <p className="text-xs text-[var(--muted-foreground)]">{p.type} · {p.date}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-green-600">₦{p.amount.toLocaleString()}</p>
-                      <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">Confirmed</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Member</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Item / Campaign</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Amount</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Status</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {payments.map(p => (
+                    <tr key={p.id} className="text-xs hover:bg-slate-50">
+                      <td className="p-3 font-medium">{p.member?.firstName} {p.member?.lastName}</td>
+                      <td className="p-3">{p.duesItem?.title || p.donationCampaign?.title || "Dues/Donation"}</td>
+                      <td className="p-3 font-bold text-green-600">₦{Number(p.amount).toLocaleString()}</td>
+                      <td className="p-3"><span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">{p.status}</span></td>
+                      <td className="p-3 text-[var(--muted-foreground)]">{new Date(p.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                  {payments.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="p-6 text-center text-xs text-[var(--muted-foreground)]">No payment records found.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
 
-        {/* Content tab */}
+        {/* Content Tab */}
         {activeTab === "content" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { icon: "📣", title: "Announcements", desc: "Create, edit, schedule and publish news and announcements", count: "8 published" },
-              { icon: "📅", title: "Events Manager", desc: "Manage events, registrations and attendee lists", count: "3 upcoming" },
-              { icon: "📸", title: "Gallery Manager", desc: "Upload and organize photo albums", count: "8 albums" },
-              { icon: "💼", title: "Job Approvals", desc: "Review and approve job and opportunity postings", count: "4 pending" },
-              { icon: "🏪", title: "Business Listings", desc: "Approve and manage alumni business directory entries", count: "6 active" },
-              { icon: "✉️", title: "Mass Notifications", desc: "Send announcements to all or selected member groups", count: "—" },
-            ].map(({ icon, title, desc, count }) => (
-              <div key={title} className="bg-white border border-[var(--border)] rounded p-5 hover:border-[var(--primary)] transition-colors cursor-pointer">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-2xl">{icon}</span>
-                  <span className="text-[10px] text-[var(--muted-foreground)] font-medium">{count}</span>
-                </div>
-                <p className="font-semibold text-sm text-[var(--foreground)] mb-1">{title}</p>
-                <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">{desc}</p>
-                <button className="mt-3 px-3 py-1.5 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors">
-                  Manage
-                </button>
-              </div>
-            ))}
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <button onClick={() => setShowNewsModal(true)} className="p-5 bg-white border border-[var(--border)] rounded-lg hover:border-[var(--primary)] text-left">
+                <span className="text-3xl block mb-2">📣</span>
+                <h4 className="font-bold text-sm text-[var(--foreground)]">Post News / Announcement</h4>
+                <p className="text-xs text-[var(--muted-foreground)] mt-1">Publish to the homepage announcements feed</p>
+              </button>
+              <button onClick={() => setShowEventModal(true)} className="p-5 bg-white border border-[var(--border)] rounded-lg hover:border-[var(--primary)] text-left">
+                <span className="text-3xl block mb-2">📅</span>
+                <h4 className="font-bold text-sm text-[var(--foreground)]">Create New Event</h4>
+                <p className="text-xs text-[var(--muted-foreground)] mt-1">Add events to the event calendar and homepage</p>
+              </button>
+              <button onClick={() => setShowLeadershipModal(true)} className="p-5 bg-white border border-[var(--border)] rounded-lg hover:border-[var(--primary)] text-left">
+                <span className="text-3xl block mb-2">🏛️</span>
+                <h4 className="font-bold text-sm text-[var(--foreground)]">Add EXCO Leader</h4>
+                <p className="text-xs text-[var(--muted-foreground)] mt-1">Add profiles to governing body list</p>
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Settings tab */}
+        {/* Settings Tab */}
         {activeTab === "settings" && (
-          <div className="max-w-2xl space-y-6">
-            <div className="bg-white border border-[var(--border)] rounded p-5">
-              <h3 className="font-semibold text-[var(--foreground)] mb-4">Administrative Roles</h3>
-              <div className="space-y-2">
-                {[
-                  { role: "Super Administrator", user: "System Admin", access: "Full system access" },
-                  { role: "EXCO Administrator", user: "Prof. Ifeanyi Madubueze", access: "Members, events, announcements" },
-                  { role: "Finance Administrator", user: "Alhaja Fatima Bello", access: "Payments, dues, donations" },
-                  { role: "Welfare Administrator", user: "Miss Adaeze Okafor", access: "Welfare cases only" },
-                  { role: "Content Administrator", user: "Engr. Tunde Adeyemi", access: "News, gallery, jobs" },
-                ].map(({ role, user, access }) => (
-                  <div key={role} className="flex items-center justify-between py-2 border-b border-[var(--border)] last:border-0">
-                    <div>
-                      <p className="text-sm font-medium text-[var(--foreground)]">{role}</p>
-                      <p className="text-xs text-[var(--muted-foreground)]">{user} · {access}</p>
-                    </div>
-                    <button className="text-xs text-[var(--primary)] hover:underline">Edit</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="bg-white border border-[var(--border)] rounded p-5">
-              <h3 className="font-semibold text-[var(--foreground)] mb-3">Platform Settings</h3>
-              <div className="space-y-3">
-                {[
-                  "Enable member registration",
-                  "Require email verification on registration",
-                  "Allow public alumni directory browsing",
-                  "Enable welfare request submissions",
-                  "Show EXCO profiles publicly",
-                ].map((setting) => (
-                  <label key={setting} className="flex items-center justify-between cursor-pointer">
-                    <span className="text-sm text-[var(--foreground)]">{setting}</span>
-                    <input type="checkbox" defaultChecked className="w-4 h-4 accent-[var(--primary)]" />
-                  </label>
-                ))}
-              </div>
-            </div>
+          <div className="bg-white border border-[var(--border)] rounded p-6 max-w-xl">
+            <h3 className="font-bold text-sm mb-3">Realtime Admin Controls</h3>
+            <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
+              All member approvals, announcements, events, and Alumni of the Week settings operate live against the Neon PostgreSQL database.
+            </p>
           </div>
         )}
       </div>
+
+      {/* Alumni of the Week Modal */}
+      {showAOTWModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="font-bold text-lg mb-2">Set Alumni of the Week</h3>
+            <p className="text-xs text-[var(--muted-foreground)] mb-4">
+              Member: <strong>{showAOTWModal.firstName} {showAOTWModal.lastName}</strong>
+            </p>
+            <form onSubmit={handleSetAlumniOfWeek} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium mb-1">Recognition Citation / Biography</label>
+                <textarea
+                  required
+                  rows={4}
+                  value={aotwBio}
+                  onChange={e => setAotwBio(e.target.value)}
+                  placeholder="Explain why this alumnus is recognized this week..."
+                  className="w-full p-2.5 border rounded text-xs focus:outline-none focus:ring-2 focus:ring-[var(--ring)]"
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button type="button" onClick={() => setShowAOTWModal(null)} className="px-4 py-2 border rounded text-xs font-medium">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-[var(--primary)] text-white rounded text-xs font-semibold">Confirm AOTW</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Event Modal */}
+      {showEventModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="font-bold text-lg mb-4">Create Upcoming Event</h3>
+            <form onSubmit={handleCreateEvent} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-medium mb-1">Event Title *</label>
+                <input required type="text" value={eventForm.title} onChange={e => setEventForm({...eventForm, title: e.target.value})} className="w-full p-2 border rounded" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-medium mb-1">Date *</label>
+                  <input required type="date" value={eventForm.date} onChange={e => setEventForm({...eventForm, date: e.target.value})} className="w-full p-2 border rounded" />
+                </div>
+                <div>
+                  <label className="block font-medium mb-1">Time</label>
+                  <input type="text" placeholder="10:00 AM" value={eventForm.time} onChange={e => setEventForm({...eventForm, time: e.target.value})} className="w-full p-2 border rounded" />
+                </div>
+              </div>
+              <div>
+                <label className="block font-medium mb-1">Venue / Location *</label>
+                <input required type="text" placeholder="e.g. Main Auditorium, CLI" value={eventForm.venue} onChange={e => setEventForm({...eventForm, venue: e.target.value})} className="w-full p-2 border rounded" />
+              </div>
+              <div>
+                <label className="block font-medium mb-1">Description *</label>
+                <textarea required rows={3} value={eventForm.description} onChange={e => setEventForm({...eventForm, description: e.target.value})} className="w-full p-2 border rounded" />
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <button type="button" onClick={() => setShowEventModal(false)} className="px-4 py-2 border rounded font-medium">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-[var(--primary)] text-white rounded font-semibold">Create Event</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* News Modal */}
+      {showNewsModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="font-bold text-lg mb-4">Post Announcement / News</h3>
+            <form onSubmit={handleCreateNews} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-medium mb-1">Title *</label>
+                <input required type="text" value={newsForm.title} onChange={e => setNewsForm({...newsForm, title: e.target.value})} className="w-full p-2 border rounded" />
+              </div>
+              <div>
+                <label className="block font-medium mb-1">Category *</label>
+                <select value={newsForm.category} onChange={e => setNewsForm({...newsForm, category: e.target.value})} className="w-full p-2 border rounded">
+                  <option value="OFFICIAL_ANNOUNCEMENT">Official Announcement</option>
+                  <option value="ASSOCIATION_NEWS">Association News</option>
+                  <option value="ALUMNI_ACHIEVEMENT">Alumni Achievement</option>
+                  <option value="IMPORTANT_NOTICE">Important Notice</option>
+                </select>
+              </div>
+              <div>
+                <label className="block font-medium mb-1">Content *</label>
+                <textarea required rows={4} value={newsForm.content} onChange={e => setNewsForm({...newsForm, content: e.target.value})} className="w-full p-2 border rounded" />
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <button type="button" onClick={() => setShowNewsModal(false)} className="px-4 py-2 border rounded font-medium">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-[var(--primary)] text-white rounded font-semibold">Post Announcement</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Leadership Modal */}
+      {showLeadershipModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="font-bold text-lg mb-4">Add EXCO Leader Profile</h3>
+            <form onSubmit={handleCreateLeadership} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-medium mb-1">Full Name *</label>
+                <input required type="text" value={leadershipForm.name} onChange={e => setLeadershipForm({...leadershipForm, name: e.target.value})} className="w-full p-2 border rounded" />
+              </div>
+              <div>
+                <label className="block font-medium mb-1">Position / Office *</label>
+                <input required type="text" placeholder="e.g. President, General Secretary" value={leadershipForm.position} onChange={e => setLeadershipForm({...leadershipForm, position: e.target.value})} className="w-full p-2 border rounded" />
+              </div>
+              <div>
+                <label className="block font-medium mb-1">Biography *</label>
+                <textarea required rows={3} value={leadershipForm.biography} onChange={e => setLeadershipForm({...leadershipForm, biography: e.target.value})} className="w-full p-2 border rounded" />
+              </div>
+              <div>
+                <label className="block font-medium mb-1">Term Start Year *</label>
+                <input required type="number" value={leadershipForm.termStart} onChange={e => setLeadershipForm({...leadershipForm, termStart: Number(e.target.value)})} className="w-full p-2 border rounded" />
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <button type="button" onClick={() => setShowLeadershipModal(false)} className="px-4 py-2 border rounded font-medium">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-[var(--primary)] text-white rounded font-semibold">Save Profile</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

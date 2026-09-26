@@ -237,6 +237,9 @@ model Member {
   // JSON string storing privacy flags: { "emailPublic": false, "phonePublic": false, etc. }
   privacySettings Json?
 
+  isAlumniOfWeek  Boolean   @default(false)
+  alumniOfWeekBio String?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
