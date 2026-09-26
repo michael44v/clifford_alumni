@@ -64,8 +64,8 @@ export default function App() {
     navigate("home");
   };
 
-  const showNav = !NO_NAV.includes(currentPage);
-  const showFooter = !NO_FOOTER.includes(currentPage) && currentPage !== "login" && currentPage !== "register";
+  const showNav = !NO_NAV.includes(currentPage) && !(currentPage === "dashboard" && isAdmin);
+  const showFooter = !NO_FOOTER.includes(currentPage) && !(currentPage === "dashboard" && isAdmin) && currentPage !== "login" && currentPage !== "register";
 
   return (
     <div className="flex flex-col min-h-full bg-[var(--background)]">
@@ -93,11 +93,11 @@ export default function App() {
         {currentPage === "dashboard" && isLoggedIn && !isAdmin && (
           <MemberDashboard onNavigate={navigate} />
         )}
+        {(currentPage === "dashboard" || currentPage === "admin") && isLoggedIn && isAdmin && (
+          <AdminDashboard onNavigate={navigate} onLogout={handleLogout} />
+        )}
         {currentPage === "dashboard" && !isLoggedIn && (
           <LoginJoin mode="login" onLogin={handleLogin} onNavigate={navigate} />
-        )}
-        {currentPage === "admin" && isAdmin && (
-          <AdminDashboard onNavigate={navigate} onLogout={handleLogout} />
         )}
       </main>
 

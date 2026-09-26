@@ -4,44 +4,58 @@ import { apiFetch } from "../lib/api";
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface AdminDashboardProps { onNavigate: (page: Page) => void; onLogout: () => void; }
 
-type AdminTab = "overview" | "members" | "welfare" | "payments" | "content" | "settings";
+type AdminTab = "overview" | "roster" | "members" | "welfare" | "payments" | "content" | "settings";
 
 export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const [adminStats, setAdminStats] = useState<any | null>(null);
   const [members, setMembers] = useState<any[]>([]);
+  const [roster, setRoster] = useState<any[]>([]);
   const [welfareCases, setWelfareCases] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
+  const [faculties, setFaculties] = useState<any[]>([]);
+  const [sets, setSets] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Search/Filters
   const [memberSearch, setMemberSearch] = useState("");
   const [memberFilterStatus, setMemberFilterStatus] = useState("");
+  const [rosterSearch, setRosterSearch] = useState("");
 
   // Modals state
   const [showEventModal, setShowEventModal] = useState(false);
   const [showNewsModal, setShowNewsModal] = useState(false);
   const [showLeadershipModal, setShowLeadershipModal] = useState(false);
   const [showAOTWModal, setShowAOTWModal] = useState<any | null>(null);
+  const [showRosterModal, setShowRosterModal] = useState(false);
 
   // Forms
   const [eventForm, setEventForm] = useState({ title: "", description: "", date: "", time: "", venue: "", category: "General", organizer: "CUAA" });
   const [newsForm, setNewsForm] = useState({ title: "", content: "", category: "OFFICIAL_ANNOUNCEMENT" });
   const [leadershipForm, setLeadershipForm] = useState({ name: "", position: "", biography: "", termStart: new Date().getFullYear() });
   const [aotwBio, setAotwBio] = useState("");
+  const [rosterForm, setRosterForm] = useState({ matricNumber: "", firstName: "", lastName: "", facultyId: "", graduatingSetId: "", department: "" });
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const stats = await apiFetch("/api/admin/stats");
-      setAdminStats(stats);
+      const [statsRes, membersRes, rosterRes, welfareRes, paymentsRes, facultiesRes, setsRes] = await Promise.all([
+        apiFetch("/api/admin/stats").catch(() => null),
+        apiFetch(`/api/admin/members?search=${encodeURIComponent(memberSearch)}&status=${memberFilterStatus}`).catch(() => []),
+        apiFetch(`/api/admin/official-directory?search=${encodeURIComponent(rosterSearch)}`).catch(() => []),
+        apiFetch("/api/welfare/admin/cases").catch(() => []),
+        apiFetch("/api/admin/payments").catch(() => []),
+        apiFetch("/api/admin/faculties").catch(() => []),
+        apiFetch("/api/admin/sets").catch(() => []),
+      ]);
 
-      const membersRes = await apiFetch(`/api/admin/members?search=${encodeURIComponent(memberSearch)}&status=${memberFilterStatus}`);
+      if (statsRes) setAdminStats(statsRes);
       setMembers(Array.isArray(membersRes) ? membersRes : []);
-
-      const welfareRes = await apiFetch("/api/welfare/admin/cases");
+      setRoster(Array.isArray(rosterRes) ? rosterRes : []);
       setWelfareCases(Array.isArray(welfareRes) ? welfareRes : []);
-
-      const paymentsRes = await apiFetch("/api/admin/payments");
       setPayments(Array.isArray(paymentsRes) ? paymentsRes : []);
+      setFaculties(Array.isArray(facultiesRes) ? facultiesRes : []);
+      setSets(Array.isArray(setsRes) ? setsRes : []);
     } catch (err) {
       console.error("Admin fetchData error:", err);
     } finally {
@@ -51,7 +65,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
 
   useEffect(() => {
     fetchData();
-  }, [memberSearch, memberFilterStatus]);
+  }, [memberSearch, memberFilterStatus, rosterSearch]);
 
   const updateMemberStatus = async (id: string, verificationStatus: string) => {
     try {
@@ -167,13 +181,39 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     }
   };
 
+  const handleAddRosterEntry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await apiFetch("/api/admin/official-directory", {
+        method: "POST",
+        body: JSON.stringify(rosterForm),
+      });
+      alert("Matriculation entry added to official directory roster!");
+      setShowRosterModal(false);
+      setRosterForm({ matricNumber: "", firstName: "", lastName: "", facultyId: "", graduatingSetId: "", department: "" });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to add roster entry");
+    }
+  };
+
+  const handleDeleteRosterEntry = async (id: string) => {
+    if (!confirm("Remove this entry from the official directory roster?")) return;
+    try {
+      await apiFetch(`/api/admin/official-directory/${id}`, { method: "DELETE" });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to delete entry");
+    }
+  };
+
   const stats = [
     { label: "Total Alumni", value: adminStats?.totalMembers || members.length || "0", color: "text-[var(--secondary)]" },
     { label: "Verified Members", value: adminStats?.verifiedMembers || members.filter(m => m.verificationStatus === "VERIFIED").length || "0", color: "text-green-600" },
+    { label: "Official Directory Roster", value: roster.length || "0", color: "text-purple-600" },
     { label: "Pending Verification", value: adminStats?.pendingVerifications || members.filter(m => m.verificationStatus === "PENDING").length || "0", color: "text-amber-600" },
     { label: "Welfare Cases", value: adminStats?.activeWelfareCases || welfareCases.filter(w => w.status !== "RESOLVED").length || "0", color: "text-red-600" },
     { label: "Total Dues (₦)", value: `₦${Number(adminStats?.financials?.totalDuesCollected || 0).toLocaleString()}`, color: "text-[var(--primary)]" },
-    { label: "Total Payments", value: payments.length || "0", color: "text-blue-600" },
   ];
 
   const pendingMembers = members.filter(m => m.verificationStatus === "PENDING");
@@ -198,9 +238,9 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {/* Navigation Tabs */}
         <div className="flex overflow-x-auto gap-1 bg-white border border-[var(--border)] p-1 rounded mb-6">
-          {(["overview", "members", "welfare", "payments", "content", "settings"] as AdminTab[]).map(tab => (
+          {(["overview", "roster", "members", "welfare", "payments", "content", "settings"] as AdminTab[]).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-shrink-0 px-4 py-2 rounded text-xs font-medium capitalize whitespace-nowrap transition-colors ${activeTab === tab ? "bg-[var(--secondary)] text-white" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}>
-              {tab} {tab === "members" && pendingMembers.length > 0 ? `(${pendingMembers.length})` : ""}
+              {tab === "roster" ? "Official Roster" : tab} {tab === "members" && pendingMembers.length > 0 ? `(${pendingMembers.length})` : ""}
             </button>
           ))}
         </div>
@@ -251,6 +291,11 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
               <div className="bg-white border border-[var(--border)] rounded p-5">
                 <h3 className="font-semibold text-[var(--foreground)] mb-4">Realtime Control Actions</h3>
                 <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => setShowRosterModal(true)} className="p-3 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] text-left">
+                    <span className="text-lg block mb-1">🎓</span>
+                    <strong>Add Official Matric</strong>
+                    <p className="text-[10px] text-[var(--muted-foreground)]">Add to Official Alumni Directory</p>
+                  </button>
                   <button onClick={() => setShowNewsModal(true)} className="p-3 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] text-left">
                     <span className="text-lg block mb-1">📣</span>
                     <strong>Post Announcement</strong>
@@ -266,15 +311,71 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                     <strong>Add EXCO Leader</strong>
                     <p className="text-[10px] text-[var(--muted-foreground)]">Update governing body</p>
                   </button>
-                  <button onClick={() => setActiveTab("members")} className="p-3 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] text-left">
-                    <span className="text-lg block mb-1">🏆</span>
-                    <strong>Alumni of the Week</strong>
-                    <p className="text-[10px] text-[var(--muted-foreground)]">Select member recognition</p>
-                  </button>
                 </div>
               </div>
             </div>
           </>
+        )}
+
+        {/* Official Directory Roster Tab */}
+        {activeTab === "roster" && (
+          <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
+            <div className="p-4 border-b border-[var(--border)] flex flex-col sm:flex-row gap-3 items-center justify-between">
+              <div className="flex gap-2 w-full sm:w-auto">
+                <input
+                  type="text"
+                  placeholder="Search roster by matric, name, department..."
+                  value={rosterSearch}
+                  onChange={e => setRosterSearch(e.target.value)}
+                  className="px-3 py-1.5 border border-[var(--border)] rounded text-xs w-full sm:w-64"
+                />
+              </div>
+              <div className="flex gap-2 items-center">
+                <p className="text-xs text-[var(--muted-foreground)]">Total Entries: <strong>{roster.length}</strong></p>
+                <button onClick={() => setShowRosterModal(true)} className="px-3 py-1.5 bg-[var(--primary)] text-white rounded text-xs font-semibold hover:bg-[var(--accent)] transition-colors">
+                  + Add Matric Entry
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Matric Number</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Name</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Faculty / Department</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Graduating Set</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Is Registered?</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {roster.map(r => (
+                    <tr key={r.id} className="text-xs hover:bg-slate-50">
+                      <td className="p-3 font-mono font-bold text-[var(--primary)]">{r.matricNumber}</td>
+                      <td className="p-3 font-medium text-[var(--foreground)]">{r.firstName} {r.lastName}</td>
+                      <td className="p-3 text-[var(--muted-foreground)]">{r.faculty?.name}<br />{r.department}</td>
+                      <td className="p-3 text-[var(--muted-foreground)]">{r.graduatingSet?.setName} ({r.graduatingSet?.graduationYear})</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${r.isRegistered ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                          {r.isRegistered ? "Registered" : "Unclaimed"}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <button onClick={() => handleDeleteRosterEntry(r.id)} className="px-2 py-1 bg-red-100 text-red-700 rounded text-[10px] font-semibold hover:bg-red-200">Delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {roster.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="p-6 text-center text-xs text-[var(--muted-foreground)]">No official directory roster entries found. Click "+ Add Matric Entry" above to add valid alumni matriculation numbers.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
 
         {/* Members Tab */}
@@ -474,11 +575,61 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
           <div className="bg-white border border-[var(--border)] rounded p-6 max-w-xl">
             <h3 className="font-bold text-sm mb-3">Realtime Admin Controls</h3>
             <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-              All member approvals, announcements, events, and Alumni of the Week settings operate live against the Neon PostgreSQL database.
+              All member approvals, announcements, events, official roster management, and Alumni of the Week settings operate live against the Neon PostgreSQL database.
             </p>
           </div>
         )}
       </div>
+
+      {/* Roster Entry Modal */}
+      {showRosterModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6">
+            <h3 className="font-bold text-lg mb-2">Add Official Alumni Directory Record</h3>
+            <p className="text-xs text-[var(--muted-foreground)] mb-4">Pre-authorize a graduate's matriculation number for instant registration verification.</p>
+            <form onSubmit={handleAddRosterEntry} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-medium mb-1">Matriculation Number *</label>
+                <input required type="text" placeholder="e.g. CLU/2021/LAW/005" value={rosterForm.matricNumber} onChange={e => setRosterForm({...rosterForm, matricNumber: e.target.value})} className="w-full p-2 border rounded font-mono" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-medium mb-1">First Name *</label>
+                  <input required type="text" value={rosterForm.firstName} onChange={e => setRosterForm({...rosterForm, firstName: e.target.value})} className="w-full p-2 border rounded" />
+                </div>
+                <div>
+                  <label className="block font-medium mb-1">Last Name *</label>
+                  <input required type="text" value={rosterForm.lastName} onChange={e => setRosterForm({...rosterForm, lastName: e.target.value})} className="w-full p-2 border rounded" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-medium mb-1">Faculty *</label>
+                  <select required value={rosterForm.facultyId} onChange={e => setRosterForm({...rosterForm, facultyId: e.target.value})} className="w-full p-2 border rounded bg-white">
+                    <option value="">Select Faculty</option>
+                    {faculties.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-medium mb-1">Graduating Set *</label>
+                  <select required value={rosterForm.graduatingSetId} onChange={e => setRosterForm({...rosterForm, graduatingSetId: e.target.value})} className="w-full p-2 border rounded bg-white">
+                    <option value="">Select Set</option>
+                    {sets.map(s => <option key={s.id} value={s.id}>{s.setName} ({s.graduationYear})</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block font-medium mb-1">Department / Programme *</label>
+                <input required type="text" placeholder="e.g. Computer Science" value={rosterForm.department} onChange={e => setRosterForm({...rosterForm, department: e.target.value})} className="w-full p-2 border rounded" />
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <button type="button" onClick={() => setShowRosterModal(false)} className="px-4 py-2 border rounded font-medium">Cancel</button>
+                <button type="submit" className="px-4 py-2 bg-[var(--primary)] text-white rounded font-semibold">Save Record</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Alumni of the Week Modal */}
       {showAOTWModal && (
