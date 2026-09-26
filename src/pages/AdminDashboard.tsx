@@ -4,13 +4,14 @@ import { apiFetch } from "../lib/api";
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface AdminDashboardProps { onNavigate: (page: Page) => void; onLogout: () => void; }
 
-type AdminTab = "overview" | "roster" | "members" | "welfare" | "payments" | "donations" | "content" | "settings";
+type AdminTab = "overview" | "roster" | "members" | "media" | "welfare" | "payments" | "donations" | "content" | "settings";
 
 export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const [adminStats, setAdminStats] = useState<any | null>(null);
   const [members, setMembers] = useState<any[]>([]);
   const [roster, setRoster] = useState<any[]>([]);
+  const [galleryPhotos, setGalleryPhotos] = useState<any[]>([]);
   const [welfareCases, setWelfareCases] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [faculties, setFaculties] = useState<any[]>([]);
@@ -23,6 +24,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [impactStats, setImpactStats] = useState<any | null>(null);
   const [scholarshipsForm, setScholarshipsForm] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selectedMemberDetail, setSelectedMemberDetail] = useState<any | null>(null);
 
   // Search/Filters
   const [memberSearch, setMemberSearch] = useState("");
@@ -53,10 +55,11 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [statsRes, membersRes, rosterRes, welfareRes, paymentsRes, facultiesRes, setsRes, eventsRes, newsRes, leadershipRes, duesRes, campaignsRes, impactRes] = await Promise.all([
+      const [statsRes, membersRes, rosterRes, mediaRes, welfareRes, paymentsRes, facultiesRes, setsRes, eventsRes, newsRes, leadershipRes, duesRes, campaignsRes, impactRes] = await Promise.all([
         apiFetch("/api/admin/stats").catch(() => null),
         apiFetch(`/api/admin/members?search=${encodeURIComponent(memberSearch)}&status=${memberFilterStatus}`).catch(() => []),
         apiFetch(`/api/admin/official-directory?search=${encodeURIComponent(rosterSearch)}`).catch(() => []),
+        apiFetch("/api/gallery/admin/photos").catch(() => []),
         apiFetch("/api/welfare/admin/cases").catch(() => []),
         apiFetch("/api/admin/payments").catch(() => []),
         apiFetch("/api/admin/faculties").catch(() => []),
@@ -72,6 +75,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       if (statsRes) setAdminStats(statsRes);
       setMembers(Array.isArray(membersRes) ? membersRes : []);
       setRoster(Array.isArray(rosterRes) ? rosterRes : []);
+      setGalleryPhotos(Array.isArray(mediaRes) ? mediaRes : []);
       setWelfareCases(Array.isArray(welfareRes) ? welfareRes : []);
       setPayments(Array.isArray(paymentsRes) ? paymentsRes : []);
       setFaculties(Array.isArray(facultiesRes) ? facultiesRes : []);
@@ -102,9 +106,43 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         method: "PUT",
         body: JSON.stringify({ verificationStatus }),
       });
+      if (selectedMemberDetail && selectedMemberDetail.id === id) {
+        setSelectedMemberDetail({ ...selectedMemberDetail, verificationStatus });
+      }
       fetchData();
     } catch (err: any) {
       alert(err.message || "Failed to update member status");
+    }
+  };
+
+  const handleFetchMemberDetails = async (id: string) => {
+    try {
+      const data = await apiFetch(`/api/admin/members/${id}/details`);
+      setSelectedMemberDetail(data);
+    } catch (err: any) {
+      alert(err.message || "Failed to fetch member details");
+    }
+  };
+
+  const handleToggleFeaturedPhoto = async (photo: any) => {
+    try {
+      await apiFetch(`/api/admin/gallery/photos/${photo.id}/featured`, {
+        method: "PUT",
+        body: JSON.stringify({ isFeatured: !photo.isFeatured }),
+      });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to update photo showcase status");
+    }
+  };
+
+  const handleDeletePhoto = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this photo from the gallery?")) return;
+    try {
+      await apiFetch(`/api/admin/gallery/photos/${id}`, { method: "DELETE" });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to delete photo");
     }
   };
 
@@ -389,9 +427,9 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {/* Navigation Tabs */}
         <div className="flex overflow-x-auto gap-1 bg-white border border-[var(--border)] p-1 rounded mb-6">
-          {(["overview", "roster", "members", "welfare", "payments", "donations", "content", "settings"] as AdminTab[]).map(tab => (
+          {(["overview", "roster", "members", "media", "welfare", "payments", "donations", "content", "settings"] as AdminTab[]).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-shrink-0 px-4 py-2 rounded text-xs font-medium capitalize whitespace-nowrap transition-colors ${activeTab === tab ? "bg-[var(--secondary)] text-white" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}>
-              {tab === "roster" ? "Official Roster" : tab} {tab === "members" && pendingMembers.length > 0 ? `(${pendingMembers.length})` : ""}
+              {tab === "roster" ? "Official Roster" : tab === "media" ? "Media Gallery" : tab} {tab === "members" && pendingMembers.length > 0 ? `(${pendingMembers.length})` : ""}
             </button>
           ))}
         </div>
@@ -548,7 +586,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                   <option value="SUSPENDED">SUSPENDED</option>
                 </select>
               </div>
-              <p className="text-xs text-[var(--muted-foreground)]">Total: <strong>{members.length}</strong> members</p>
+              <p className="text-xs text-[var(--muted-foreground)]">Total: <strong>{members.length}</strong> members (Click row to view full details)</p>
             </div>
 
             <div className="overflow-x-auto">
@@ -565,8 +603,8 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
                   {members.map(m => (
-                    <tr key={m.id} className="text-xs hover:bg-slate-50">
-                      <td className="p-3 font-medium text-[var(--foreground)]">{m.firstName} {m.lastName}</td>
+                    <tr key={m.id} className="text-xs hover:bg-amber-50 cursor-pointer transition-colors" onClick={() => handleFetchMemberDetails(m.id)}>
+                      <td className="p-3 font-semibold text-[var(--primary)] underline">{m.firstName} {m.lastName}</td>
                       <td className="p-3 text-[var(--muted-foreground)]">{m.email}<br />{m.phone || '—'}</td>
                       <td className="p-3 text-[var(--muted-foreground)]">{m.matricNumber || 'N/A'}<br /><span className="text-[10px] font-semibold">{m.memberType}</span></td>
                       <td className="p-3">
@@ -574,7 +612,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                           {m.verificationStatus}
                         </span>
                       </td>
-                      <td className="p-3">
+                      <td className="p-3" onClick={e => e.stopPropagation()}>
                         {m.isAlumniOfWeek ? (
                           <div className="flex items-center gap-1 text-amber-600 font-bold">
                             <span>🏆 Active</span>
@@ -586,8 +624,9 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                           </button>
                         )}
                       </td>
-                      <td className="p-3">
+                      <td className="p-3" onClick={e => e.stopPropagation()}>
                         <div className="flex gap-1">
+                          <button onClick={() => handleFetchMemberDetails(m.id)} className="px-2.5 py-1 bg-[var(--primary)] text-white rounded text-[10px] font-semibold">View Details</button>
                           {m.verificationStatus !== "VERIFIED" && (
                             <button onClick={() => updateMemberStatus(m.id, "VERIFIED")} className="px-2 py-1 bg-green-600 text-white rounded text-[10px] font-semibold hover:bg-green-700">Approve</button>
                           )}
@@ -605,6 +644,76 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Media Tab */}
+        {activeTab === "media" && (
+          <div className="bg-white border border-[var(--border)] rounded overflow-hidden p-5">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-2 border-b border-[var(--border)] pb-4">
+              <div>
+                <h3 className="font-bold text-base text-[var(--secondary)]">Uploaded Photos Media Manager</h3>
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  Review all user-uploaded photos. Select photos to show on the public landing page showcase or delete inappropriate uploads.
+                </p>
+              </div>
+              <span className="px-3 py-1 bg-[var(--muted)] text-[var(--primary)] font-bold text-xs rounded">
+                Total Photos: {galleryPhotos.length}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {galleryPhotos.map((photo) => (
+                <div key={photo.id} className="border border-[var(--border)] rounded-lg overflow-hidden bg-slate-50 flex flex-col hover:shadow-md transition-shadow">
+                  <div className="h-44 bg-[var(--muted)] relative overflow-hidden">
+                    <img src={photo.media?.secureUrl} alt={photo.caption || "Showcase photo"} className="w-full h-full object-cover" />
+                    {photo.isFeatured && (
+                      <span className="absolute top-2 right-2 px-2 py-0.5 bg-amber-500 text-white font-bold text-[10px] rounded shadow uppercase tracking-wide">
+                        🌟 Landing Page Featured
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-3 text-xs flex-1 flex flex-col justify-between">
+                    <div className="space-y-1">
+                      <p className="font-semibold text-[var(--foreground)] line-clamp-1">{photo.album?.title || "Gallery Showcase"}</p>
+                      {photo.caption && <p className="text-[var(--muted-foreground)] italic line-clamp-2">"{photo.caption}"</p>}
+                      <div className="pt-2 border-t border-[var(--border)] text-[11px]">
+                        <p className="text-[var(--primary)] font-bold">
+                          Uploader: {photo.uploadedBy?.firstName} {photo.uploadedBy?.lastName}
+                        </p>
+                        <p className="text-[var(--muted-foreground)] text-[10px]">{photo.uploadedBy?.email} · {photo.uploadedBy?.matricNumber || 'No Matric'}</p>
+                        <p className="text-[10px] text-[var(--muted-foreground)]">{new Date(photo.createdAt).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 pt-2 border-t border-[var(--border)] flex gap-2">
+                      <button
+                        onClick={() => handleToggleFeaturedPhoto(photo)}
+                        className={`flex-1 py-1.5 rounded text-[11px] font-bold transition-colors ${
+                          photo.isFeatured
+                            ? "bg-amber-100 border border-amber-400 text-amber-800 hover:bg-amber-200"
+                            : "bg-green-600 text-white hover:bg-green-700"
+                        }`}
+                      >
+                        {photo.isFeatured ? "Unfeature" : "+ Add to Landing Page"}
+                      </button>
+                      <button
+                        onClick={() => handleDeletePhoto(photo.id)}
+                        className="px-2.5 py-1.5 bg-red-100 text-red-700 font-bold rounded text-[11px] hover:bg-red-200"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {galleryPhotos.length === 0 && (
+                <div className="col-span-full text-center py-12 text-[var(--muted-foreground)]">
+                  <p className="text-4xl mb-2">🖼️</p>
+                  <p className="font-semibold text-sm">No photos uploaded to the gallery showcase yet.</p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -926,6 +1035,159 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
           </div>
         )}
       </div>
+
+      {/* Detailed Member Profile Modal */}
+      {selectedMemberDetail && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setSelectedMemberDetail(null)}>
+          <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-5" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-start border-b border-[var(--border)] pb-4">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[var(--primary)] bg-[var(--muted)] flex-shrink-0">
+                  <img src={selectedMemberDetail.profilePhoto?.secureUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&auto=format"} alt={selectedMemberDetail.firstName} className="w-full h-full object-cover" />
+                </div>
+                <div>
+                  <h2 className="font-display text-xl font-bold text-[var(--secondary)]">{selectedMemberDetail.firstName} {selectedMemberDetail.lastName}</h2>
+                  <p className="text-xs text-[var(--muted-foreground)]">{selectedMemberDetail.email} · {selectedMemberDetail.phone || 'No phone'}</p>
+                  <div className="flex gap-2 mt-1.5 items-center">
+                    <span className="font-mono text-[11px] font-bold text-[var(--primary)] bg-[var(--muted)] px-2 py-0.5 rounded">
+                      Matric: {selectedMemberDetail.matricNumber || 'N/A'}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${selectedMemberDetail.verificationStatus === "VERIFIED" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                      {selectedMemberDetail.verificationStatus}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => setSelectedMemberDetail(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl">✕</button>
+            </div>
+
+            {/* Quick Actions Bar */}
+            <div className="flex items-center justify-between bg-[var(--muted)] p-3 rounded text-xs">
+              <span className="font-semibold text-[var(--foreground)]">Admin Actions for Member:</span>
+              <div className="flex gap-2">
+                {selectedMemberDetail.verificationStatus !== "VERIFIED" && (
+                  <button onClick={() => updateMemberStatus(selectedMemberDetail.id, "VERIFIED")} className="px-3 py-1 bg-green-600 text-white rounded font-bold hover:bg-green-700">
+                    Approve Member
+                  </button>
+                )}
+                {selectedMemberDetail.verificationStatus !== "SUSPENDED" && (
+                  <button onClick={() => updateMemberStatus(selectedMemberDetail.id, "SUSPENDED")} className="px-3 py-1 bg-red-600 text-white rounded font-bold hover:bg-red-700">
+                    Suspend Member
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* General Info Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs bg-slate-50 p-4 border border-[var(--border)] rounded-lg">
+              <div>
+                <p className="text-[var(--muted-foreground)] text-[10px]">Graduating Set</p>
+                <p className="font-bold">{selectedMemberDetail.graduatingSet?.setName || 'N/A'} ({selectedMemberDetail.graduatingSet?.graduationYear || ''})</p>
+              </div>
+              <div>
+                <p className="text-[var(--muted-foreground)] text-[10px]">Faculty & Department</p>
+                <p className="font-bold">{selectedMemberDetail.faculty?.name || 'N/A'} - {selectedMemberDetail.department || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-[var(--muted-foreground)] text-[10px]">Profession / Company</p>
+                <p className="font-bold">{selectedMemberDetail.profession || 'N/A'} {selectedMemberDetail.company ? `@ ${selectedMemberDetail.company}` : ''}</p>
+              </div>
+              <div>
+                <p className="text-[var(--muted-foreground)] text-[10px]">Location</p>
+                <p className="font-bold">{selectedMemberDetail.location?.state || selectedMemberDetail.diasporaCountry || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-[var(--muted-foreground)] text-[10px]">Account Role</p>
+                <p className="font-bold text-[var(--primary)]">{selectedMemberDetail.role}</p>
+              </div>
+              <div>
+                <p className="text-[var(--muted-foreground)] text-[10px]">Member Type</p>
+                <p className="font-bold">{selectedMemberDetail.memberType}</p>
+              </div>
+              {selectedMemberDetail.bio && (
+                <div className="col-span-full pt-2 border-t border-[var(--border)]">
+                  <p className="text-[var(--muted-foreground)] text-[10px]">Short Bio</p>
+                  <p className="italic text-[var(--foreground)] mt-0.5">{selectedMemberDetail.bio}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Uploaded Gallery Photos */}
+            <div>
+              <h3 className="font-bold text-sm text-[var(--secondary)] mb-2">Uploaded Gallery Photos ({(selectedMemberDetail.galleryPhotosUploaded || []).length})</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {(selectedMemberDetail.galleryPhotosUploaded || []).map((p: any) => (
+                  <div key={p.id} className="h-28 rounded border border-[var(--border)] overflow-hidden relative bg-[var(--muted)]">
+                    <img src={p.media?.secureUrl} alt={p.caption || "Photo"} className="w-full h-full object-cover" />
+                    {p.isFeatured && (
+                      <span className="absolute top-1 left-1 px-1 bg-amber-500 text-white text-[9px] font-bold rounded">Featured</span>
+                    )}
+                  </div>
+                ))}
+                {(selectedMemberDetail.galleryPhotosUploaded || []).length === 0 && (
+                  <p className="col-span-full text-xs text-[var(--muted-foreground)] py-2">No photos uploaded by this member.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Payment Records */}
+            <div>
+              <h3 className="font-bold text-sm text-[var(--secondary)] mb-2">Payment Records ({(selectedMemberDetail.paymentRecords || []).length})</h3>
+              <div className="overflow-x-auto border border-[var(--border)] rounded">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
+                      <th className="p-2 text-[var(--muted-foreground)] font-medium">Item / Campaign</th>
+                      <th className="p-2 text-[var(--muted-foreground)] font-medium">Amount</th>
+                      <th className="p-2 text-[var(--muted-foreground)] font-medium">Status</th>
+                      <th className="p-2 text-[var(--muted-foreground)] font-medium">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border)]">
+                    {(selectedMemberDetail.paymentRecords || []).map((p: any) => (
+                      <tr key={p.id}>
+                        <td className="p-2 font-medium">{p.duesItem?.title || p.donationCampaign?.title || 'Dues/Donation'}</td>
+                        <td className="p-2 font-bold text-green-600">₦{Number(p.amount).toLocaleString()}</td>
+                        <td className="p-2"><span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded">{p.status}</span></td>
+                        <td className="p-2 text-[var(--muted-foreground)]">{new Date(p.createdAt).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                    {(selectedMemberDetail.paymentRecords || []).length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="p-3 text-center text-xs text-[var(--muted-foreground)]">No payments recorded.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Welfare Cases */}
+            <div>
+              <h3 className="font-bold text-sm text-[var(--secondary)] mb-2">Welfare Requests ({(selectedMemberDetail.welfareRequests || []).length})</h3>
+              <div className="space-y-2">
+                {(selectedMemberDetail.welfareRequests || []).map((w: any) => (
+                  <div key={w.id} className="p-3 border border-[var(--border)] rounded bg-slate-50 text-xs">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-bold text-[var(--primary)]">{w.category}</span>
+                      <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded">{w.status}</span>
+                    </div>
+                    <p className="text-[var(--muted-foreground)] leading-relaxed">{w.description}</p>
+                    <p className="text-[10px] text-[var(--muted-foreground)] mt-1">{new Date(w.createdAt).toLocaleString()}</p>
+                  </div>
+                ))}
+                {(selectedMemberDetail.welfareRequests || []).length === 0 && (
+                  <p className="text-xs text-[var(--muted-foreground)] py-1">No welfare cases submitted.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-[var(--border)]">
+              <button onClick={() => setSelectedMemberDetail(null)} className="px-5 py-2 bg-[var(--primary)] text-white rounded text-xs font-semibold">Close Profile</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Event Attendees Modal */}
       {selectedEventAttendees && (
