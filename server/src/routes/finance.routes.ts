@@ -35,10 +35,13 @@ const updateCampaignSchema = z.object({
 });
 
 const donateSchema = z.object({
-  donationCampaignId: z.string().uuid(),
+  donationCampaignId: z.string().optional(),
   amount: z.number().positive(),
   paymentMethod: z.nativeEnum(PaymentMethod).optional(),
 });
+
+// Memory store for admin override impact stats if any
+let customScholarshipsAwarded: number | null = null;
 
 // Interface for Payment Gateway Abstraction
 interface PaymentGatewayResult {
@@ -214,15 +217,77 @@ router.post("/pay-dues", authenticateJWT, validateBody(payDuesSchema), async (re
   }
 });
 
+// GET /api/finance/impact-stats (Public live impact stats from DB)
+router.get("/impact-stats", async (req, res) => {
+  try {
+    const currentYear = new Date().getFullYear();
+    const startOfYear = new Date(currentYear, 0, 1);
+
+    const [resolvedWelfareCount, donationPayments] = await Promise.all([
+      prisma.welfareRequest.count({ where: { status: "RESOLVED" } }),
+      prisma.paymentRecord.findMany({
+        where: {
+          donationCampaignId: { not: null },
+          status: "SUCCESSFUL",
+        },
+        select: { amount: true, memberId: true, createdAt: true },
+      }),
+    ]);
+
+    const totalDonationsAmount = donationPayments.reduce((sum, p) => sum + p.amount, 0);
+    const donorsThisYear = new Set(
+      donationPayments.filter(p => new Date(p.createdAt) >= startOfYear).map(p => p.memberId)
+    ).size;
+
+    return res.json({
+      membersSupported: resolvedWelfareCount,
+      scholarshipsAwarded: customScholarshipsAwarded !== null ? customScholarshipsAwarded : 0,
+      totalDonationsAmount,
+      donorsThisYear,
+    });
+  } catch (err) {
+    console.error("Fetch impact stats error:", err);
+    return res.status(500).json({ error: "Failed to fetch impact statistics" });
+  }
+});
+
+// PUT /api/admin/impact-stats (Admin update custom impact stats)
+router.put("/admin/impact-stats", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "FINANCE_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { scholarshipsAwarded } = req.body;
+    if (scholarshipsAwarded !== undefined) {
+      customScholarshipsAwarded = Number(scholarshipsAwarded);
+    }
+    return res.json({ scholarshipsAwarded: customScholarshipsAwarded });
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to update impact stats" });
+  }
+});
+
 // POST /api/finance/donate (Stubbed payment gateway)
 router.post("/donate", authenticateJWT, validateBody(donateSchema), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { donationCampaignId, amount, paymentMethod } = req.body;
+    let { donationCampaignId, amount, paymentMethod } = req.body;
     const memberId = req.user!.userId;
 
-    const campaign = await prisma.donationCampaign.findUnique({ where: { id: donationCampaignId } });
+    let campaign: any = null;
+    if (donationCampaignId) {
+      campaign = await prisma.donationCampaign.findUnique({ where: { id: donationCampaignId } }).catch(() => null);
+    }
+
     if (!campaign) {
-      return res.status(404).json({ error: "Donation campaign not found" });
+      // Find first active campaign or create default
+      campaign = await prisma.donationCampaign.findFirst({ where: { isActive: true } });
+      if (!campaign) {
+        campaign = await prisma.donationCampaign.create({
+          data: {
+            title: "General Alumni Fund",
+            description: "Support alumni association projects and community welfare",
+            targetAmount: 5000000,
+            isActive: true,
+          },
+        });
+      }
     }
 
     const gatewayResult = await SimulatedPaymentGateway.processPayment(
@@ -233,7 +298,7 @@ router.post("/donate", authenticateJWT, validateBody(donateSchema), async (req: 
     const paymentRecord = await prisma.paymentRecord.create({
       data: {
         memberId,
-        donationCampaignId,
+        donationCampaignId: campaign.id,
         amount,
         paymentMethod: paymentMethod || "PAYSTACK",
         transactionRef: gatewayResult.transactionRef,
@@ -246,7 +311,7 @@ router.post("/donate", authenticateJWT, validateBody(donateSchema), async (req: 
 
     // Update campaign raised total
     await prisma.donationCampaign.update({
-      where: { id: donationCampaignId },
+      where: { id: campaign.id },
       data: { raisedAmount: { increment: amount } },
     });
 
