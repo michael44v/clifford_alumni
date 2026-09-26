@@ -1,0 +1,587 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS
+// -----------------------------------------------------------------------------
+
+enum MemberType {
+  ALUMNI
+  ASSOCIATE
+}
+
+enum Role {
+  MEMBER
+  ADMIN
+  SUPER_ADMIN
+  EXCO_ADMIN
+  FINANCE_ADMIN
+  WELFARE_ADMIN
+  CONTENT_ADMIN
+  MODERATOR
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  SUSPENDED
+  INACTIVE
+}
+
+enum ListingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESSFUL
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  PAYSTACK
+  FLUTTERWAVE
+  BANK_TRANSFER
+  CASH
+}
+
+enum DuesType {
+  ANNUAL_DUES
+  SPECIAL_LEVY
+  PROJECT_LEVY
+}
+
+enum WelfareCategory {
+  EMERGENCY
+  BEREAVEMENT
+  ILLNESS
+  FINANCIAL_ASSISTANCE
+  DISASTER_RELIEF
+  OTHER
+}
+
+enum WelfareUrgency {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum WelfareStatus {
+  NEW
+  PENDING
+  IN_REVIEW
+  RESOLVED
+  REJECTED
+  CLOSED
+}
+
+enum NewsCategory {
+  ASSOCIATION_NEWS
+  OFFICIAL_ANNOUNCEMENT
+  SCHOOL_MANAGEMENT
+  ALUMNI_ACHIEVEMENT
+  WEDDING
+  BEREAVEMENT
+  CAREER_MILESTONE
+  IMPORTANT_NOTICE
+}
+
+enum GalleryCategory {
+  INDIVIDUAL_ALUMNI
+  GRADUATING_SET
+  REUNION
+  AGM
+  ALUMNI_EVENT
+  UNIVERSITY_MEMORIES
+  HISTORICAL_ARCHIVE
+  OTHER
+}
+
+// -----------------------------------------------------------------------------
+// MEDIA MODEL (Cloudinary Assets)
+// -----------------------------------------------------------------------------
+
+model Media {
+  id                 String   @id @default(uuid())
+  cloudinaryPublicId String   @unique
+  secureUrl          String
+  resourceType       String   @default("image") // image, raw, video
+  format             String?
+  width              Int?
+  height             Int?
+  bytes              Int?
+  folder             String?
+  createdAt          DateTime @default(now())
+
+  // Relations back to entities referencing Media
+  memberProfiles       Member[]           @relation("MemberProfilePhoto")
+  events               Event[]            @relation("EventBanner")
+  newsAnnouncements    NewsAnnouncement[] @relation("NewsBanner")
+  galleryPhotos        GalleryPhoto[]
+  businessLogos        BusinessListing[]  @relation("BusinessLogo")
+  businessBanners      BusinessListing[]  @relation("BusinessBanner")
+  leadershipPhotos     LeadershipProfile[]
+  paymentProofs        PaymentRecord[]    @relation("PaymentProof")
+  discussionPosts      DiscussionPost[]
+}
+
+// -----------------------------------------------------------------------------
+// REFERENCE & LOOKUP TABLES
+// -----------------------------------------------------------------------------
+
+model GraduatingSet {
+  id             String   @id @default(uuid())
+  setName        String   @unique // e.g., "Alpha Set"
+  graduationYear Int      @unique // e.g., 2020
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  members                  Member[]
+  officialDirectoryEntries OfficialAlumniDirectory[]
+  galleryAlbums            GalleryAlbum[]
+}
+
+model Faculty {
+  id        String   @id @default(uuid())
+  name      String   @unique // e.g., "Faculty of Law", "OTHERS"
+  code      String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members                  Member[]
+  officialDirectoryEntries OfficialAlumniDirectory[]
+}
+
+model Location {
+  id          String   @id @default(uuid())
+  state       String   // e.g. "Abia", "Lagos", "FCT (Abuja)", or Country name if Diaspora
+  city        String?  // e.g. "Aba", "Ikeja"
+  isDiaspora  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members Member[]
+
+  @@unique([state, city])
+  @@index([state])
+}
+
+// -----------------------------------------------------------------------------
+// OFFICIAL ALUMNI DIRECTORY (PRE-LOADED VERIFICATION ROSTER)
+// -----------------------------------------------------------------------------
+
+model OfficialAlumniDirectory {
+  id             String   @id @default(uuid())
+  matricNumber   String   @unique
+  firstName      String
+  lastName       String
+  graduatingSetId String
+  facultyId      String
+  department     String
+  isRegistered   Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  graduatingSet GraduatingSet @relation(fields: [graduatingSetId], references: [id])
+  faculty       Faculty       @relation(fields: [facultyId], references: [id])
+
+  @@index([matricNumber])
+}
+
+// -----------------------------------------------------------------------------
+// MEMBER & AUTH MODELS
+// -----------------------------------------------------------------------------
+
+model Member {
+  id                 String             @id @default(uuid())
+  email              String             @unique
+  passwordHash       String
+  matricNumber       String?            @unique
+  memberType         MemberType         @default(ALUMNI)
+  role               Role               @default(MEMBER)
+  verificationStatus VerificationStatus @default(PENDING)
+
+  firstName String
+  lastName  String
+  phone     String?
+
+  graduatingSetId String?
+  facultyId       String?
+  department      String?
+
+  locationId     String?
+  diasporaCountry String?
+  diasporaCity   String?
+
+  profession String?
+  company    String?
+  bio        String?
+  skills     String[] @default([])
+
+  profilePhotoMediaId String?
+  profilePhoto        Media?  @relation("MemberProfilePhoto", fields: [profilePhotoMediaId], references: [id], onDelete: SetNull)
+
+  // JSON string storing privacy flags: { "emailPublic": false, "phonePublic": false, etc. }
+  privacySettings Json?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Relationships
+  graduatingSet GraduatingSet? @relation(fields: [graduatingSetId], references: [id])
+  faculty       Faculty?       @relation(fields: [facultyId], references: [id])
+  location      Location?      @relation(fields: [locationId], references: [id])
+
+  refreshTokens          RefreshToken[]
+  eventRegistrations     EventRegistration[]
+  newsAnnouncements      NewsAnnouncement[]  @relation("AuthorNews")
+  galleryPhotosUploaded  GalleryPhoto[]      @relation("UploadedPhotos")
+  businessListings       BusinessListing[]
+  paymentRecords         PaymentRecord[]
+  welfareRequests        WelfareRequest[]    @relation("MemberWelfareRequests")
+  assignedWelfareCases   WelfareRequest[]    @relation("AssignedWelfareOfficer")
+  discussionPosts        DiscussionPost[]
+  discussionComments     DiscussionComment[]
+  sentMessages           ChatMessage[]       @relation("SentMessages")
+  receivedMessages       ChatMessage[]       @relation("ReceivedMessages")
+  notifications          Notification[]
+
+  @@index([matricNumber])
+  @@index([email])
+  @@index([verificationStatus])
+  @@index([graduatingSetId])
+  @@index([facultyId])
+}
+
+model RefreshToken {
+  id          String   @id @default(uuid())
+  memberId    String
+  hashedToken String   @unique
+  deviceInfo  String?
+  expiresAt   DateTime
+  isRevoked   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@index([hashedToken])
+}
+
+// -----------------------------------------------------------------------------
+// EVENTS
+// -----------------------------------------------------------------------------
+
+model Event {
+  id            String   @id @default(uuid())
+  title         String
+  slug          String   @unique
+  description   String
+  bannerMediaId String?
+  eventDate     DateTime
+  time          String
+  venue         String
+  isVirtual     Boolean  @default(false)
+  meetingLink   String?
+  organizer     String   @default("CUAA")
+  category      String   @default("General")
+  capacity      Int?
+  createdById   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  banner Media? @relation("EventBanner", fields: [bannerMediaId], references: [id], onDelete: SetNull)
+
+  registrations EventRegistration[]
+
+  @@index([eventDate])
+  @@index([slug])
+}
+
+model EventRegistration {
+  id           String   @id @default(uuid())
+  eventId      String
+  memberId     String
+  status       String   @default("REGISTERED") // REGISTERED, ATTENDED, CANCELLED
+  registeredAt DateTime @default(now())
+
+  event  Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, memberId])
+}
+
+// -----------------------------------------------------------------------------
+// NEWS & ANNOUNCEMENTS
+// -----------------------------------------------------------------------------
+
+model NewsAnnouncement {
+  id            String       @id @default(uuid())
+  title         String
+  slug          String       @unique
+  content       String
+  category      NewsCategory @default(OFFICIAL_ANNOUNCEMENT)
+  bannerMediaId String?
+  isPublished   Boolean      @default(true)
+  publishedAt   DateTime     @default(now())
+  createdById   String
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  banner Media?  @relation("NewsBanner", fields: [bannerMediaId], references: [id], onDelete: SetNull)
+  author Member @relation("AuthorNews", fields: [createdById], references: [id])
+
+  @@index([category])
+  @@index([publishedAt])
+}
+
+// -----------------------------------------------------------------------------
+// GALLERY ALBUMS & PHOTOS
+// -----------------------------------------------------------------------------
+
+model GalleryAlbum {
+  id              String          @id @default(uuid())
+  title           String
+  description     String?
+  category        GalleryCategory @default(ALUMNI_EVENT)
+  graduatingSetId String?
+  year            Int?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  graduatingSet GraduatingSet? @relation(fields: [graduatingSetId], references: [id])
+  photos        GalleryPhoto[]
+
+  @@index([category])
+  @@index([graduatingSetId])
+}
+
+model GalleryPhoto {
+  id           String   @id @default(uuid())
+  albumId      String
+  mediaId      String
+  caption      String?
+  uploadedById String
+  createdAt    DateTime @default(now())
+
+  album      GalleryAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  media      Media        @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  uploadedBy Member       @relation("UploadedPhotos", fields: [uploadedById], references: [id])
+
+  @@index([albumId])
+}
+
+// -----------------------------------------------------------------------------
+// BUSINESS DIRECTORY
+// -----------------------------------------------------------------------------
+
+model BusinessListing {
+  id              String        @id @default(uuid())
+  memberId        String
+  businessName    String
+  category        String
+  industry        String
+  description     String
+  services        String
+  logoMediaId     String?
+  bannerMediaId   String?
+  address         String?
+  stateCity       String?
+  website         String?
+  phone           String?
+  email           String?
+  status          ListingStatus @default(PENDING)
+  rejectionReason String?
+  isFeatured      Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  logo   Media?  @relation("BusinessLogo", fields: [logoMediaId], references: [id], onDelete: SetNull)
+  banner Media?  @relation("BusinessBanner", fields: [bannerMediaId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([category])
+  @@index([memberId])
+}
+
+// -----------------------------------------------------------------------------
+// FINANCE & PAYMENTS
+// -----------------------------------------------------------------------------
+
+model DuesItem {
+  id           String   @id @default(uuid())
+  title        String   // e.g. "2025 Annual Alumni Membership Dues"
+  type         DuesType @default(ANNUAL_DUES)
+  amount       Float
+  academicYear String?  // e.g. "2024/2025"
+  isRequired   Boolean  @default(true)
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  payments PaymentRecord[]
+}
+
+model DonationCampaign {
+  id           String   @id @default(uuid())
+  title        String
+  description  String
+  targetAmount Float
+  raisedAmount Float    @default(0)
+  startDate    DateTime @default(now())
+  endDate      DateTime?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  payments PaymentRecord[]
+}
+
+model PaymentRecord {
+  id                 String        @id @default(uuid())
+  memberId           String
+  duesItemId         String?
+  donationCampaignId String?
+  amount             Float
+  paymentMethod      PaymentMethod @default(PAYSTACK)
+  transactionRef     String        @unique
+  receiptNumber      String        @unique
+  status             PaymentStatus @default(PENDING)
+  proofMediaId       String?
+  paidAt             DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  member           Member            @relation(fields: [memberId], references: [id])
+  duesItem         DuesItem?         @relation(fields: [duesItemId], references: [id])
+  donationCampaign DonationCampaign? @relation(fields: [donationCampaignId], references: [id])
+  proofMedia       Media?            @relation("PaymentProof", fields: [proofMediaId], references: [id])
+
+  @@index([memberId])
+  @@index([status])
+  @@index([transactionRef])
+}
+
+// -----------------------------------------------------------------------------
+// WELFARE CENTER
+// -----------------------------------------------------------------------------
+
+model WelfareRequest {
+  id                String          @id @default(uuid())
+  memberId          String
+  category          WelfareCategory @default(OTHER)
+  urgency           WelfareUrgency  @default(MEDIUM)
+  status            WelfareStatus   @default(NEW)
+  description       String
+  assignedOfficerId String?
+  internalNotes     String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  member          Member  @relation("MemberWelfareRequests", fields: [memberId], references: [id])
+  assignedOfficer Member? @relation("AssignedWelfareOfficer", fields: [assignedOfficerId], references: [id])
+
+  @@index([memberId])
+  @@index([status])
+  @@index([urgency])
+}
+
+// -----------------------------------------------------------------------------
+// DISCUSSIONS & CHAT
+// -----------------------------------------------------------------------------
+
+model DiscussionPost {
+  id        String   @id @default(uuid())
+  authorId  String
+  category  String   @default("General")
+  title     String
+  content   String
+  mediaId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author   Member              @relation(fields: [authorId], references: [id])
+  media    Media?              @relation(fields: [mediaId], references: [id])
+  comments DiscussionComment[]
+
+  @@index([category])
+  @@index([authorId])
+}
+
+model DiscussionComment {
+  id        String   @id @default(uuid())
+  postId    String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+
+  post   DiscussionPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author Member         @relation(fields: [authorId], references: [id])
+
+  @@index([postId])
+}
+
+model ChatMessage {
+  id          String   @id @default(uuid())
+  senderId    String
+  receiverId  String
+  messageText String
+  isRead      Boolean  @default(false)
+  sentAt      DateTime @default(now())
+
+  sender   Member @relation("SentMessages", fields: [senderId], references: [id])
+  receiver Member @relation("ReceivedMessages", fields: [receiverId], references: [id])
+
+  @@index([senderId, receiverId])
+}
+
+// -----------------------------------------------------------------------------
+// NOTIFICATIONS & LEADERSHIP
+// -----------------------------------------------------------------------------
+
+model Notification {
+  id        String   @id @default(uuid())
+  memberId  String
+  title     String
+  message   String
+  type      String   @default("GENERAL")
+  isRead    Boolean  @default(false)
+  linkUrl   String?
+  createdAt DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId, isRead])
+}
+
+model LeadershipProfile {
+  id           String   @id @default(uuid())
+  name         String
+  position     String
+  biography    String
+  photoMediaId String?
+  termStart    Int
+  termEnd      Int?
+  isCurrent    Boolean  @default(true)
+  orderIndex   Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  photo Media? @relation(fields: [photoMediaId], references: [id], onDelete: SetNull)
+
+  @@index([isCurrent, orderIndex])
+}
