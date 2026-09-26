@@ -15,6 +15,8 @@ export function getAccessToken(): string | null {
   return accessToken;
 }
 
+const BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+
 export async function apiFetch<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {});
   if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
@@ -25,17 +27,20 @@ export async function apiFetch<T = any>(endpoint: string, options: RequestInit =
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
 
-  const response = await fetch(endpoint, {
+  const url = endpoint.startsWith("http") ? endpoint : `${BASE_URL}${endpoint.startsWith("/") ? "" : "/"}${endpoint}`;
+
+  const response = await fetch(url, {
     ...options,
     headers,
-    credentials: "same-origin", // includes httpOnly refreshToken cookie
+    credentials: "include", // includes httpOnly refreshToken cookie
   });
 
   // Handle token refresh on 401
-  if (response.status === 401 && endpoint !== "/api/auth/refresh" && endpoint !== "/api/auth/login") {
-    const refreshRes = await fetch("/api/auth/refresh", {
+  if (response.status === 401 && !endpoint.includes("/api/auth/refresh") && !endpoint.includes("/api/auth/login")) {
+    const refreshUrl = `${BASE_URL}/api/auth/refresh`;
+    const refreshRes = await fetch(refreshUrl, {
       method: "POST",
-      credentials: "same-origin",
+      credentials: "include",
     });
 
     if (refreshRes.ok) {
@@ -44,10 +49,10 @@ export async function apiFetch<T = any>(endpoint: string, options: RequestInit =
       headers.set("Authorization", `Bearer ${data.accessToken}`);
 
       // Retry original request
-      const retryResponse = await fetch(endpoint, {
+      const retryResponse = await fetch(url, {
         ...options,
         headers,
-        credentials: "same-origin",
+        credentials: "include",
       });
 
       if (!retryResponse.ok) {
