@@ -55,30 +55,45 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
     setLoading(true);
     try {
       const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_test_sample";
-      if (typeof (window as any).PaystackPop !== "undefined") {
-        const handler = (window as any).PaystackPop.setup({
+      const PaystackPop = (window as any).PaystackPop;
+
+      if (PaystackPop) {
+        const handleSuccess = async (response: any) => {
+          await apiFetch("/api/finance/donate", {
+            method: "POST",
+            body: JSON.stringify({
+              donationCampaignId: currentCause.id,
+              amount: finalAmount,
+              paymentMethod: "PAYSTACK",
+            }),
+          });
+          setSubmitted(true);
+          fetchData();
+        };
+
+        const handleClose = () => {
+          alert("Donation payment window closed.");
+        };
+
+        const popConfig = {
           key: paystackKey,
           email: "donor@cliffordalumni.ng",
           amount: finalAmount * 100, // amount in kobo
           currency: "NGN",
           ref: "DON-" + Math.floor(Math.random() * 1000000000 + 1),
-          callback: async (response: any) => {
-            await apiFetch("/api/finance/donate", {
-              method: "POST",
-              body: JSON.stringify({
-                donationCampaignId: currentCause.id,
-                amount: finalAmount,
-                paymentMethod: "PAYSTACK",
-              }),
-            });
-            setSubmitted(true);
-            fetchData();
-          },
-          onClose: () => {
-            alert("Donation payment window closed.");
-          },
-        });
-        handler.openIframe();
+          callback: handleSuccess,
+          onSuccess: handleSuccess,
+          onClose: handleClose,
+          onCancel: handleClose,
+        };
+
+        if (typeof PaystackPop.setup === "function") {
+          const handler = PaystackPop.setup(popConfig);
+          handler.openIframe();
+        } else {
+          const paystack = new PaystackPop();
+          paystack.newTransaction(popConfig);
+        }
       } else {
         await apiFetch("/api/finance/donate", {
           method: "POST",
