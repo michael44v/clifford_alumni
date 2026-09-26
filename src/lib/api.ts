@@ -62,6 +62,9 @@ export async function apiFetch<T = any>(endpoint: string, options: RequestInit =
       return retryResponse.json();
     } else {
       setAccessToken(null);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("cuaa:session-expired"));
+      }
       throw new Error("Session expired. Please log in again.");
     }
   }
