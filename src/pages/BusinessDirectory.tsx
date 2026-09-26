@@ -1,30 +1,55 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { apiFetch } from "../lib/api";
+
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface BusinessProps { onNavigate: (page: Page) => void; isLoggedIn: boolean; }
-
-const businesses = [
-  { id: 1, name: "Emeka Tech Solutions", owner: "Emeka Okafor", set: "Beta Set (2017)", faculty: "Natural Sciences", industry: "Technology", category: "Technology & ICT", services: "Web development, mobile applications, IT consulting and software solutions", location: "Lagos, Lagos State", contact: "Available to verified members", website: "emekatechsolutions.ng", status: "Active", img: "https://images.unsplash.com/photo-1551434678-e076c223a692?w=300&h=200&fit=crop&auto=format", featured: true },
-  { id: 2, name: "Adaeze Legal & Advisory", owner: "Adaeze Nwachukwu", set: "Alpha Set (2016)", faculty: "Law", industry: "Legal Services", category: "Legal & Professional", services: "Corporate law, property law, litigation, legal advisory and dispute resolution", location: "FCT (Abuja)", contact: "Available to verified members", website: "adaeze-legal.ng", status: "Active", img: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=300&h=200&fit=crop&auto=format", featured: true },
-  { id: 3, name: "Chidi Capital Advisors", owner: "Chidi Obiora", set: "Gamma Set (2018)", faculty: "Social Sciences", industry: "Finance", category: "Finance & Investment", services: "Investment advisory, portfolio management, financial planning and wealth management", location: "Rivers State", contact: "Available to verified members", website: "", status: "Active", img: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=300&h=200&fit=crop&auto=format", featured: false },
-  { id: 4, name: "FarmForward Agribusiness", owner: "Michael Uche", set: "Gamma Set (2018)", faculty: "Management Sciences", industry: "Agriculture", category: "Agriculture & Food", services: "Agribusiness consulting, crop production, supply chain management, farm inputs", location: "Abia State", contact: "Available to verified members", website: "", status: "Active", img: "https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=300&h=200&fit=crop&auto=format", featured: false },
-  { id: 5, name: "Amaka EduHub", owner: "Amaka Okoro", set: "Alpha Set (2016)", faculty: "Education", industry: "Education", category: "Education & Training", services: "Online tutoring, e-learning content development, educational consulting and curriculum design", location: "Enugu State", contact: "Available to verified members", website: "", status: "Active", img: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=300&h=200&fit=crop&auto=format", featured: false },
-  { id: 6, name: "Fatima Health Plus", owner: "Fatima Yusuf", set: "Beta Set (2017)", faculty: "Natural Sciences", industry: "Healthcare", category: "Health & Wellness", services: "Health education, wellness coaching, pharmaceutical consultancy and clinical research support", location: "Kano State", contact: "Available to verified members", website: "", status: "Active", img: "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=300&h=200&fit=crop&auto=format", featured: false },
-];
 
 const categories = ["All Categories", "Technology & ICT", "Legal & Professional", "Finance & Investment", "Agriculture & Food", "Education & Training", "Health & Wellness", "Construction & Engineering", "Media & Creative", "Retail & Commerce", "Transport & Logistics"];
 
 export default function BusinessDirectory({ onNavigate, isLoggedIn }: BusinessProps) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All Categories");
-  const [selectedBusiness, setSelectedBusiness] = useState<typeof businesses[0] | null>(null);
+  const [businesses, setBusinesses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedBusiness, setSelectedBusiness] = useState<any | null>(null);
   const [showListForm, setShowListForm] = useState(false);
-
-  const filtered = businesses.filter(b => {
-    const q = search.toLowerCase();
-    const matchQ = !q || b.name.toLowerCase().includes(q) || b.services.toLowerCase().includes(q) || b.owner.toLowerCase().includes(q);
-    const matchCat = category === "All Categories" || b.category === category;
-    return matchQ && matchCat;
+  const [newBiz, setNewBiz] = useState({
+    businessName: "",
+    category: "Technology & ICT",
+    industry: "Services",
+    description: "",
+    services: "",
+    stateCity: "",
+    website: "",
+    phone: "",
+    email: "",
   });
+
+  useEffect(() => {
+    setLoading(true);
+    let url = `/api/business?search=${encodeURIComponent(search)}`;
+    if (category !== "All Categories") url += `&category=${encodeURIComponent(category)}`;
+    apiFetch(url)
+      .then(res => setBusinesses(res.data || []))
+      .catch(err => console.error(err))
+      .finally(() => setLoading(false));
+  }, [search, category]);
+
+  const handleCreateBusiness = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await apiFetch("/api/business", {
+        method: "POST",
+        body: JSON.stringify(newBiz),
+      });
+      alert("Business listing submitted! It will appear once approved by admin.");
+      setShowListForm(false);
+    } catch (err: any) {
+      alert(err.message || "Failed to submit business listing");
+    }
+  };
+
+  const filtered = businesses;
 
   return (
     <div className="bg-[var(--background)]">
@@ -101,30 +126,40 @@ export default function BusinessDirectory({ onNavigate, isLoggedIn }: BusinessPr
         <p className="text-sm text-[var(--muted-foreground)] mb-4">
           Showing <strong>{filtered.length}</strong> listing{filtered.length !== 1 ? "s" : ""}
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filtered.map(b => (
-            <div key={b.id} onClick={() => setSelectedBusiness(b)} className="bg-white border border-[var(--border)] rounded-xl overflow-hidden hover:shadow-md hover:border-[var(--primary)] transition-all cursor-pointer">
-              <div className="h-36 bg-[var(--muted)] overflow-hidden">
-                <img src={b.img} alt={b.name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
-              </div>
-              <div className="p-4">
-                <div className="flex items-start justify-between gap-2 mb-0.5">
-                  <h3 className="font-semibold text-sm text-[var(--foreground)] leading-snug">{b.name}</h3>
-                  <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0 mt-1.5" />
-                </div>
-                <p className="text-[11px] text-[var(--primary)] font-medium">{b.owner} · {b.set}</p>
-                <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5 font-medium">{b.category}</p>
-                <p className="text-xs text-[var(--muted-foreground)] mt-1.5 leading-relaxed line-clamp-2">{b.services}</p>
-                <p className="text-[11px] text-[var(--muted-foreground)] mt-1.5">📍 {b.location}</p>
-                <button className="mt-3 w-full py-1.5 border border-[var(--border)] rounded-lg text-xs font-medium hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors">
-                  View Details
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
 
-        {filtered.length === 0 && (
+        {loading ? (
+          <div className="text-center py-12 text-[var(--muted-foreground)]">Loading business directory...</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filtered.map(b => {
+              const ownerName = b.owner ? `${b.owner.firstName || ''} ${b.owner.lastName || ''}` : "Verified Alumnus";
+              const logo = b.logo?.url || b.banner?.url || "https://images.unsplash.com/photo-1551434678-e076c223a692?w=300&h=200&fit=crop&auto=format";
+
+              return (
+                <div key={b.id} onClick={() => setSelectedBusiness(b)} className="bg-white border border-[var(--border)] rounded-xl overflow-hidden hover:shadow-md hover:border-[var(--primary)] transition-all cursor-pointer">
+                  <div className="h-36 bg-[var(--muted)] overflow-hidden">
+                    <img src={logo} alt={b.businessName} className="w-full h-full object-cover hover:scale-105 transition-transform duration-500" />
+                  </div>
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-2 mb-0.5">
+                      <h3 className="font-semibold text-sm text-[var(--foreground)] leading-snug">{b.businessName}</h3>
+                      <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0 mt-1.5" />
+                    </div>
+                    <p className="text-[11px] text-[var(--primary)] font-medium">{ownerName}</p>
+                    <p className="text-[11px] text-[var(--muted-foreground)] mt-0.5 font-medium">{b.category}</p>
+                    <p className="text-xs text-[var(--muted-foreground)] mt-1.5 leading-relaxed line-clamp-2">{b.services || b.description}</p>
+                    <p className="text-[11px] text-[var(--muted-foreground)] mt-1.5">📍 {b.stateCity || "Nigeria"}</p>
+                    <button className="mt-3 w-full py-1.5 border border-[var(--border)] rounded-lg text-xs font-medium hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors">
+                      View Details
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {!loading && filtered.length === 0 && (
           <div className="text-center py-16 text-[var(--muted-foreground)]">
             <p className="text-4xl mb-3">🏪</p>
             <p className="font-semibold">No businesses found</p>
@@ -147,27 +182,23 @@ export default function BusinessDirectory({ onNavigate, isLoggedIn }: BusinessPr
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelectedBusiness(null)}>
           <div className="bg-white rounded-xl max-w-lg w-full overflow-hidden shadow-xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="h-48 bg-[var(--muted)] overflow-hidden relative">
-              <img src={selectedBusiness.img} alt={selectedBusiness.name} className="w-full h-full object-cover" />
+              <img src={selectedBusiness.logo?.url || selectedBusiness.banner?.url || "https://images.unsplash.com/photo-1551434678-e076c223a692?w=300&h=200&fit=crop&auto=format"} alt={selectedBusiness.businessName} className="w-full h-full object-cover" />
               <button onClick={() => setSelectedBusiness(null)} className="absolute top-3 right-3 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center text-sm hover:bg-black/70">✕</button>
             </div>
             <div className="p-6">
               <span className="inline-block px-2 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] text-[10px] font-semibold rounded-md mb-3">{selectedBusiness.category}</span>
-              <h2 className="font-display text-2xl font-bold text-[var(--secondary)] mb-1">{selectedBusiness.name}</h2>
-              <p className="text-[var(--primary)] text-sm font-medium mb-4">{selectedBusiness.owner} · {selectedBusiness.set} · {selectedBusiness.faculty}</p>
+              <h2 className="font-display text-2xl font-bold text-[var(--secondary)] mb-1">{selectedBusiness.businessName}</h2>
+              <p className="text-[var(--primary)] text-sm font-medium mb-4">{selectedBusiness.owner ? `${selectedBusiness.owner.firstName} ${selectedBusiness.owner.lastName}` : 'Verified Alumnus'}</p>
               <div className="space-y-2 text-sm mb-5">
-                <p><span className="font-medium">Services:</span> <span className="text-[var(--muted-foreground)]">{selectedBusiness.services}</span></p>
-                <p><span className="font-medium">Location:</span> <span className="text-[var(--muted-foreground)]">📍 {selectedBusiness.location}</span></p>
+                <p><span className="font-medium">Services:</span> <span className="text-[var(--muted-foreground)]">{selectedBusiness.services || selectedBusiness.description}</span></p>
+                <p><span className="font-medium">Location:</span> <span className="text-[var(--muted-foreground)]">📍 {selectedBusiness.stateCity || 'Nigeria'}</span></p>
+                {selectedBusiness.phone && <p><span className="font-medium">Phone:</span> <span className="text-[var(--muted-foreground)]">{selectedBusiness.phone}</span></p>}
+                {selectedBusiness.email && <p><span className="font-medium">Email:</span> <span className="text-[var(--muted-foreground)]">{selectedBusiness.email}</span></p>}
                 {selectedBusiness.website && <p><span className="font-medium">Website:</span> <span className="text-[var(--primary)]">{selectedBusiness.website}</span></p>}
               </div>
-              {isLoggedIn ? (
-                <button className="w-full py-3 bg-[var(--primary)] text-white font-semibold rounded-lg text-sm hover:bg-[var(--accent)] transition-colors">
-                  Contact Business Owner
-                </button>
-              ) : (
-                <button onClick={() => { onNavigate("login"); setSelectedBusiness(null); }} className="w-full py-3 border border-[var(--primary)] text-[var(--primary)] font-semibold rounded-lg text-sm hover:bg-[var(--primary)] hover:text-white transition-colors">
-                  Sign in to Contact
-                </button>
-              )}
+              <button onClick={() => setSelectedBusiness(null)} className="w-full py-3 bg-[var(--primary)] text-white font-semibold rounded-lg text-sm hover:bg-[var(--accent)] transition-colors">
+                Close
+              </button>
             </div>
           </div>
         </div>
@@ -181,30 +212,41 @@ export default function BusinessDirectory({ onNavigate, isLoggedIn }: BusinessPr
               <h3 className="font-display text-xl font-bold text-[var(--secondary)]">List Your Business</h3>
               <button onClick={() => setShowListForm(false)} className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] text-lg">✕</button>
             </div>
-            <form onSubmit={(e) => { e.preventDefault(); setShowListForm(false); }} className="space-y-4">
-              {[
-                { label: "Business Name *", placeholder: "Your business or practice name", type: "text" },
-                { label: "Category *", placeholder: "", type: "select" },
-                { label: "Services / Description *", placeholder: "Describe what you offer", type: "textarea" },
-                { label: "Location (State) *", placeholder: "e.g. Lagos, FCT (Abuja)", type: "text" },
-                { label: "Website (optional)", placeholder: "https://...", type: "url" },
-              ].map(({ label, placeholder, type }) => (
-                <div key={label}>
-                  <label className="block text-xs font-medium text-[var(--foreground)] mb-1">{label}</label>
-                  {type === "textarea" ? (
-                    <textarea rows={3} placeholder={placeholder} className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" />
-                  ) : type === "select" ? (
-                    <select className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
-                      <option value="">Select category</option>
-                      {categories.slice(1).map(c => <option key={c}>{c}</option>)}
-                    </select>
-                  ) : (
-                    <input type={type} placeholder={placeholder} className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" />
-                  )}
-                </div>
-              ))}
+            <form onSubmit={handleCreateBusiness} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-[var(--foreground)] mb-1">Business Name *</label>
+                <input required type="text" value={newBiz.businessName} onChange={e => setNewBiz({...newBiz, businessName: e.target.value})} className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[var(--foreground)] mb-1">Category *</label>
+                <select value={newBiz.category} onChange={e => setNewBiz({...newBiz, category: e.target.value})} className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
+                  {categories.slice(1).map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[var(--foreground)] mb-1">Description *</label>
+                <textarea required rows={2} value={newBiz.description} onChange={e => setNewBiz({...newBiz, description: e.target.value})} className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" placeholder="Brief overview of your business..." />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[var(--foreground)] mb-1">Services Offered *</label>
+                <input required type="text" value={newBiz.services} onChange={e => setNewBiz({...newBiz, services: e.target.value})} className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" placeholder="e.g. Consulting, Web Design" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[var(--foreground)] mb-1">State / City</label>
+                <input type="text" value={newBiz.stateCity} onChange={e => setNewBiz({...newBiz, stateCity: e.target.value})} className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" placeholder="Lagos, Nigeria" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-[var(--foreground)] mb-1">Website (optional)</label>
+                <input type="text" value={newBiz.website} onChange={e => setNewBiz({...newBiz, website: e.target.value})} className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" placeholder="https://example.com" />
+              </div>
+
               <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
-                Your listing will be reviewed by the CLUAA admin team before going live (usually within 48 hours).
+                Your listing will be reviewed by the CLUAA admin team before going live.
               </p>
               <div className="flex gap-2">
                 <button type="button" onClick={() => setShowListForm(false)} className="flex-1 py-2.5 border border-[var(--border)] rounded-lg text-sm font-medium hover:border-[var(--primary)] transition-colors">Cancel</button>

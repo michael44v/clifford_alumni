@@ -1,96 +1,27 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { apiFetch } from "../lib/api";
+
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface GalleryProps { onNavigate: (page: Page) => void; }
 
-const albums = [
-  {
-    title: "AGM 2024",
-    count: 48,
-    date: "December 2024",
-    cover: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=400&fit=crop&auto=format",
-    category: "AGM",
-  },
-  {
-    title: "Homecoming Reunion 2023",
-    count: 127,
-    date: "November 2023",
-    cover: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=600&h=400&fit=crop&auto=format",
-    category: "Reunion",
-  },
-  {
-    title: "Career Fair 2023",
-    count: 34,
-    date: "September 2023",
-    cover: "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=600&h=400&fit=crop&auto=format",
-    category: "Events",
-  },
-  {
-    title: "Graduation Ceremony 2023",
-    count: 215,
-    date: "July 2023",
-    cover: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=600&h=400&fit=crop&auto=format",
-    category: "Graduation",
-  },
-  {
-    title: "Welfare Outreach 2023",
-    count: 22,
-    date: "May 2023",
-    cover: "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=600&h=400&fit=crop&auto=format",
-    category: "Welfare",
-  },
-  {
-    title: "Alumni Networking Night",
-    count: 61,
-    date: "March 2023",
-    cover: "https://images.unsplash.com/photo-1531545514256-b1400bc00f31?w=600&h=400&fit=crop&auto=format",
-    category: "Networking",
-  },
-  {
-    title: "Campus Memories Archive",
-    count: 340,
-    date: "2001 – 2022",
-    cover: "https://images.unsplash.com/photo-1562774053-701939374585?w=600&h=400&fit=crop&auto=format",
-    category: "Historical",
-  },
-  {
-    title: "University Founders Day 2022",
-    count: 88,
-    date: "October 2022",
-    cover: "https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?w=600&h=400&fit=crop&auto=format",
-    category: "Events",
-  },
-];
-
-const albums2 = [
-  {
-    title: "Alpha Set — Class Photo 2016",
-    count: 95,
-    date: "July 2016",
-    cover: "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=600&h=400&fit=crop&auto=format",
-    category: "Class Photos",
-  },
-  {
-    title: "Individual Alumni Portraits",
-    count: 420,
-    date: "Ongoing",
-    cover: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=600&h=400&fit=crop&auto=format",
-    category: "Individual Photos",
-  },
-  {
-    title: "Alumni Achievement Awards 2023",
-    count: 38,
-    date: "December 2023",
-    cover: "https://images.unsplash.com/photo-1531545514256-b1400bc00f31?w=600&h=400&fit=crop&auto=format",
-    category: "Events",
-  },
-];
-
-const allAlbums = [...albums, ...albums2];
-const categories = ["All", "AGM", "Reunion", "Events", "Graduation", "Welfare", "Networking", "Historical", "Class Photos", "Individual Photos"];
+const categories = ["All", "AGM", "REUNION", "EVENTS", "GRADUATION", "WELFARE", "NETWORKING", "HISTORICAL", "CLASS_PHOTOS"];
 
 export default function Gallery({ onNavigate }: GalleryProps) {
   const [activeCategory, setActiveCategory] = useState("All");
-  const filtered = activeCategory === "All" ? allAlbums : allAlbums.filter(a => a.category === activeCategory);
+  const [albums, setAlbums] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    let url = "/api/gallery/albums";
+    if (activeCategory !== "All") url += `?category=${encodeURIComponent(activeCategory)}`;
+    apiFetch(url)
+      .then(res => setAlbums(res.data || []))
+      .catch(err => console.error(err))
+      .finally(() => setLoading(false));
+  }, [activeCategory]);
+
+  const filtered = albums;
 
   return (
     <div className="bg-[var(--background)]">
@@ -121,26 +52,43 @@ export default function Gallery({ onNavigate }: GalleryProps) {
         </div>
 
         {/* Album Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {filtered.map((album) => (
-            <div key={album.title} className="bg-white border border-[var(--border)] rounded overflow-hidden hover:shadow-md transition-shadow cursor-pointer group">
-              <div className="h-48 bg-[var(--muted)] overflow-hidden relative">
-                <img src={album.cover} alt={album.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                  <span className="text-white text-3xl opacity-0 group-hover:opacity-100 transition-opacity">🔍</span>
+        {loading ? (
+          <div className="text-center py-12 text-[var(--muted-foreground)]">Loading photo gallery...</div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {filtered.map((album) => {
+              const coverImg = album.photos?.[0]?.media?.url || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=400&fit=crop&auto=format";
+              const photoCount = album._count?.photos || album.photos?.length || 0;
+
+              return (
+                <div key={album.id || album.title} className="bg-white border border-[var(--border)] rounded overflow-hidden hover:shadow-md transition-shadow cursor-pointer group">
+                  <div className="h-48 bg-[var(--muted)] overflow-hidden relative">
+                    <img src={coverImg} alt={album.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                      <span className="text-white text-3xl opacity-0 group-hover:opacity-100 transition-opacity">🔍</span>
+                    </div>
+                    <span className="absolute top-3 left-3 px-2 py-0.5 bg-[var(--secondary)] text-[var(--accent)] text-[10px] font-semibold uppercase tracking-wide rounded">
+                      {album.category || "GALLERY"}
+                    </span>
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-sm text-[var(--foreground)] mb-1 leading-snug">{album.title}</h3>
+                    <p className="text-xs text-[var(--muted-foreground)]">{album.year || new Date(album.createdAt).getFullYear()}</p>
+                    <p className="text-xs text-[var(--primary)] font-medium mt-1">{photoCount} photos</p>
+                  </div>
                 </div>
-                <span className="absolute top-3 left-3 px-2 py-0.5 bg-[var(--secondary)] text-[var(--accent)] text-[10px] font-semibold uppercase tracking-wide rounded">
-                  {album.category}
-                </span>
-              </div>
-              <div className="p-4">
-                <h3 className="font-semibold text-sm text-[var(--foreground)] mb-1 leading-snug">{album.title}</h3>
-                <p className="text-xs text-[var(--muted-foreground)]">{album.date}</p>
-                <p className="text-xs text-[var(--primary)] font-medium mt-1">{album.count} photos</p>
-              </div>
-            </div>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        )}
+
+        {!loading && filtered.length === 0 && (
+          <div className="text-center py-16 text-[var(--muted-foreground)]">
+            <p className="text-4xl mb-3">🖼️</p>
+            <p className="font-semibold">No photo albums found</p>
+            <p className="text-sm mt-1">Check back later for newly published albums.</p>
+          </div>
+        )}
 
         <div className="mt-10 text-center bg-[var(--muted)] rounded p-8">
           <p className="font-display text-xl font-bold text-[var(--secondary)] mb-2">Have alumni photos to share?</p>

@@ -1,49 +1,52 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { apiFetch } from "../lib/api";
+
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface FinanceProps { onNavigate: (page: Page) => void; isLoggedIn: boolean; }
 
-type FinanceTab = "dues" | "levies" | "history" | "receipts";
-
-const duesSchedule = [
-  { name: "Annual Membership Dues 2025", amount: 5000, deadline: "December 31, 2025", status: "Pending", category: "Annual Dues" },
-  { name: "Annual Membership Dues 2024", amount: 5000, deadline: "December 31, 2024", status: "Paid", category: "Annual Dues" },
-  { name: "Annual Membership Dues 2023", amount: 5000, deadline: "December 31, 2023", status: "Paid", category: "Annual Dues" },
-];
-
-const levies = [
-  { name: "AGM 2024 Event Levy", amount: 2000, deadline: "December 1, 2024", status: "Paid", category: "Event Levy" },
-  { name: "Welfare Fund Levy 2024", amount: 1000, deadline: "June 30, 2024", status: "Paid", category: "Welfare" },
-  { name: "Development Fund Levy 2025", amount: 3000, deadline: "March 31, 2025", status: "Pending", category: "Development" },
-];
-
-const paymentHistory = [
-  { id: "TXN-CUAA-20241128001", desc: "Annual Dues 2024", amount: 5000, date: "Jan 15, 2024", method: "Bank Transfer", status: "Confirmed" },
-  { id: "TXN-CUAA-20241120001", desc: "AGM 2024 Event Levy", amount: 2000, date: "Nov 20, 2024", method: "Card", status: "Confirmed" },
-  { id: "TXN-CUAA-20241010001", desc: "Welfare Fund Donation", amount: 10000, date: "Oct 10, 2024", method: "Card", status: "Confirmed" },
-  { id: "TXN-CUAA-20230115001", desc: "Annual Dues 2023", amount: 5000, date: "Jan 15, 2023", method: "Bank Transfer", status: "Confirmed" },
-  { id: "TXN-CUAA-20230515001", desc: "Welfare Fund Levy 2024", amount: 1000, date: "May 10, 2024", method: "Card", status: "Confirmed" },
-];
+type FinanceTab = "dues" | "history";
 
 export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
   const [activeTab, setActiveTab] = useState<FinanceTab>("dues");
-  const [paying, setPaying] = useState<string | null>(null);
-  const [paidItems, setPaidItems] = useState<Set<string>>(new Set());
+  const [duesList, setDuesList] = useState<any[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [payingItem, setPayingItem] = useState<any | null>(null);
 
-  const handlePay = (name: string) => {
-    if (!isLoggedIn) { onNavigate("login"); return; }
-    setPaying(name);
-  };
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    setLoading(true);
+    Promise.all([
+      apiFetch("/api/finance/dues").catch(() => []),
+      apiFetch("/api/finance/history").catch(() => []),
+    ]).then(([duesRes, histRes]) => {
+      setDuesList(Array.isArray(duesRes) ? duesRes : duesRes.data || []);
+      setPaymentHistory(Array.isArray(histRes) ? histRes : histRes.data || []);
+    }).finally(() => setLoading(false));
+  }, [isLoggedIn]);
 
-  const confirmPayment = () => {
-    if (paying) {
-      setPaidItems(prev => new Set([...prev, paying]));
-      setPaying(null);
+  const confirmPayment = async () => {
+    if (!payingItem) return;
+    try {
+      await apiFetch("/api/finance/pay-dues", {
+        method: "POST",
+        body: JSON.stringify({ duesItemId: payingItem.id }),
+      });
+      alert("Payment processed successfully!");
+      setPayingItem(null);
+      const [duesRes, histRes] = await Promise.all([
+        apiFetch("/api/finance/dues").catch(() => []),
+        apiFetch("/api/finance/history").catch(() => []),
+      ]);
+      setDuesList(Array.isArray(duesRes) ? duesRes : duesRes.data || []);
+      setPaymentHistory(Array.isArray(histRes) ? histRes : histRes.data || []);
+    } catch (err: any) {
+      alert(err.message || "Payment failed");
     }
   };
 
-  const outstandingDues = duesSchedule.filter(d => d.status === "Pending" && !paidItems.has(d.name));
-  const outstandingLevies = levies.filter(l => l.status === "Pending" && !paidItems.has(l.name));
-  const totalOutstanding = [...outstandingDues, ...outstandingLevies].reduce((s, i) => s + i.amount, 0);
+  const outstandingDues = duesList.filter(d => d.status !== "PAID");
+  const totalOutstanding = outstandingDues.reduce((s, i) => s + (i.amount || 0), 0);
 
   return (
     <div className="bg-[var(--background)]">
@@ -95,34 +98,43 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
           ))}
         </div>
 
-        {/* Annual Dues */}
+        {/* Annual Dues & Levies */}
         {activeTab === "dues" && (
           <div className="space-y-4">
             <div className="bg-[var(--muted)] rounded-xl p-4 text-sm text-[var(--muted-foreground)]">
-              <p><strong className="text-[var(--foreground)]">Annual Dues Policy:</strong> All verified CLUAA members are required to pay ₦5,000 annual dues by December 31st each year to maintain Active Member status. Members with outstanding dues will have restricted platform access.</p>
+              <p><strong className="text-[var(--foreground)]">Annual Dues Policy:</strong> All verified CLUAA members are required to pay annual dues to maintain Active Member status.</p>
             </div>
-            {duesSchedule.map((d) => {
-              const isPaid = d.status === "Paid" || paidItems.has(d.name);
-              return (
-                <div key={d.name} className="bg-white border border-[var(--border)] rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-semibold text-sm text-[var(--foreground)]">{d.name}</p>
-                      <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-md ${isPaid ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>{isPaid ? "Paid" : "Pending"}</span>
+            {loading ? (
+              <div className="text-center py-8 text-[var(--muted-foreground)]">Loading dues...</div>
+            ) : duesList.length === 0 ? (
+              <div className="text-center py-12 text-[var(--muted-foreground)] bg-white rounded-xl border border-[var(--border)]">
+                <p className="font-semibold text-base mb-1">No outstanding dues or levies schedule found</p>
+                <p className="text-xs">Your account is fully up to date.</p>
+              </div>
+            ) : (
+              duesList.map((d) => {
+                const isPaid = d.status === "PAID";
+                return (
+                  <div key={d.id || d.title} className="bg-white border border-[var(--border)] rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-semibold text-sm text-[var(--foreground)]">{d.title}</p>
+                        <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-md ${isPaid ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>{isPaid ? "Paid" : "Pending"}</span>
+                      </div>
+                      <p className="text-xs text-[var(--muted-foreground)]">Year: {d.year} · Type: {d.type || "Annual Dues"}</p>
                     </div>
-                    <p className="text-xs text-[var(--muted-foreground)]">Deadline: {d.deadline} · Category: {d.category}</p>
+                    <div className="flex items-center gap-4">
+                      <p className="font-bold text-lg text-[var(--foreground)]">₦{Number(d.amount).toLocaleString()}</p>
+                      {!isPaid ? (
+                        <button onClick={() => setPayingItem(d)} className="px-5 py-2 bg-[var(--primary)] text-white rounded-lg text-sm font-semibold hover:bg-[var(--accent)] transition-colors">Pay Now</button>
+                      ) : (
+                        <button className="px-5 py-2 border border-[var(--border)] rounded-lg text-sm font-medium text-[var(--muted-foreground)]">Receipt</button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <p className="font-bold text-lg text-[var(--foreground)]">₦{d.amount.toLocaleString()}</p>
-                    {!isPaid ? (
-                      <button onClick={() => handlePay(d.name)} className="px-5 py-2 bg-[var(--primary)] text-white rounded-lg text-sm font-semibold hover:bg-[var(--accent)] transition-colors">Pay Now</button>
-                    ) : (
-                      <button className="px-5 py-2 border border-[var(--border)] rounded-lg text-sm font-medium text-[var(--muted-foreground)]">Receipt</button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
             <div className="text-center pt-4">
               <button onClick={() => onNavigate("donate")} className="px-6 py-3 border border-[var(--primary)] text-[var(--primary)] rounded-lg text-sm font-semibold hover:bg-[var(--primary)] hover:text-white transition-colors">
                 Also Make a Donation →
@@ -131,106 +143,62 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
           </div>
         )}
 
-        {/* Levies */}
-        {activeTab === "levies" && (
-          <div className="space-y-4">
-            <div className="bg-[var(--muted)] rounded-xl p-4 text-sm text-[var(--muted-foreground)]">
-              <p><strong className="text-[var(--foreground)]">About Levies:</strong> Levies are special assessments approved by the General Assembly for specific association purposes such as events, welfare, and development projects.</p>
-            </div>
-            {levies.map((l) => {
-              const isPaid = l.status === "Paid" || paidItems.has(l.name);
-              return (
-                <div key={l.name} className="bg-white border border-[var(--border)] rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-semibold text-sm text-[var(--foreground)]">{l.name}</p>
-                      <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-md ${isPaid ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>{isPaid ? "Paid" : "Pending"}</span>
-                    </div>
-                    <p className="text-xs text-[var(--muted-foreground)]">Deadline: {l.deadline} · {l.category}</p>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <p className="font-bold text-lg text-[var(--foreground)]">₦{l.amount.toLocaleString()}</p>
-                    {!isPaid ? (
-                      <button onClick={() => handlePay(l.name)} className="px-5 py-2 bg-[var(--primary)] text-white rounded-lg text-sm font-semibold hover:bg-[var(--accent)] transition-colors">Pay Levy</button>
-                    ) : (
-                      <button className="px-5 py-2 border border-[var(--border)] rounded-lg text-sm font-medium text-[var(--muted-foreground)]">Receipt</button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
         {/* Payment History */}
         {activeTab === "history" && (
           <div className="bg-white border border-[var(--border)] rounded-xl overflow-hidden">
             <div className="px-5 py-4 border-b border-[var(--border)] flex items-center justify-between">
               <h3 className="font-semibold text-[var(--foreground)]">All Transactions</h3>
-              <button className="text-xs text-[var(--primary)] hover:underline">Export PDF</button>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
-                    {["Transaction ID", "Description", "Date", "Method", "Amount", "Status"].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paymentHistory.map(p => (
-                    <tr key={p.id} className="border-b border-[var(--border)] last:border-0">
-                      <td className="px-4 py-3 text-[11px] font-mono text-[var(--muted-foreground)]">{p.id}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-[var(--foreground)]">{p.desc}</td>
-                      <td className="px-4 py-3 text-sm text-[var(--muted-foreground)] whitespace-nowrap">{p.date}</td>
-                      <td className="px-4 py-3 text-sm text-[var(--muted-foreground)]">{p.method}</td>
-                      <td className="px-4 py-3 text-sm font-bold text-green-600">₦{p.amount.toLocaleString()}</td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-green-100 text-green-700">{p.status}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Receipts */}
-        {activeTab === "receipts" && (
-          <div className="space-y-3">
-            {paymentHistory.map(p => (
-              <div key={p.id} className="bg-white border border-[var(--border)] rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-sm text-[var(--foreground)]">{p.desc}</p>
-                  <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{p.id} · {p.date}</p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <p className="font-bold text-[var(--primary)]">₦{p.amount.toLocaleString()}</p>
-                  <button className="px-4 py-2 border border-[var(--border)] rounded-lg text-xs font-medium hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors">
-                    📄 Download Receipt
-                  </button>
-                </div>
+            {loading ? (
+              <div className="text-center py-8 text-[var(--muted-foreground)]">Loading history...</div>
+            ) : paymentHistory.length === 0 ? (
+              <div className="text-center py-12 text-[var(--muted-foreground)]">
+                <p className="font-semibold">No transactions recorded yet</p>
               </div>
-            ))}
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
+                      {["Receipt Ref", "Type", "Date", "Method", "Amount", "Status"].map(h => (
+                        <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paymentHistory.map(p => (
+                      <tr key={p.id} className="border-b border-[var(--border)] last:border-0">
+                        <td className="px-4 py-3 text-[11px] font-mono text-[var(--muted-foreground)]">{p.receiptNumber || p.id}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-[var(--foreground)]">{p.paymentType}</td>
+                        <td className="px-4 py-3 text-sm text-[var(--muted-foreground)] whitespace-nowrap">{new Date(p.createdAt).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 text-sm text-[var(--muted-foreground)]">{p.paymentMethod || "CARD"}</td>
+                        <td className="px-4 py-3 text-sm font-bold text-green-600">₦{Number(p.amount).toLocaleString()}</td>
+                        <td className="px-4 py-3">
+                          <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-green-100 text-green-700">{p.status}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {/* Payment Modal */}
-      {paying && (
+      {payingItem && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-xl">
             <h3 className="font-display text-xl font-bold text-[var(--secondary)] mb-2">Confirm Payment</h3>
             <p className="text-sm text-[var(--muted-foreground)] mb-4">You are about to pay for:</p>
             <div className="bg-[var(--muted)] rounded-lg p-3 mb-5 text-sm">
-              <p className="font-medium text-[var(--foreground)]">{paying}</p>
-              <p className="text-[var(--primary)] font-bold mt-1">₦{(duesSchedule.find(d => d.name === paying) || levies.find(l => l.name === paying))?.amount.toLocaleString()}</p>
+              <p className="font-medium text-[var(--foreground)]">{payingItem.title}</p>
+              <p className="text-[var(--primary)] font-bold mt-1">₦{Number(payingItem.amount).toLocaleString()}</p>
             </div>
-            <p className="text-xs text-[var(--muted-foreground)] mb-5">In the live system, this would redirect to a secure payment gateway. All transactions are recorded and receipts are generated automatically.</p>
+            <p className="text-xs text-[var(--muted-foreground)] mb-5">Transactions process via simulated gateway with automatic receipt generation.</p>
             <div className="flex gap-2">
-              <button onClick={() => setPaying(null)} className="flex-1 py-2.5 border border-[var(--border)] rounded-lg text-sm font-medium hover:border-[var(--primary)] transition-colors">Cancel</button>
+              <button onClick={() => setPayingItem(null)} className="flex-1 py-2.5 border border-[var(--border)] rounded-lg text-sm font-medium hover:border-[var(--primary)] transition-colors">Cancel</button>
               <button onClick={confirmPayment} className="flex-1 py-2.5 bg-[var(--primary)] text-white rounded-lg text-sm font-semibold hover:bg-[var(--accent)] transition-colors">Confirm Payment</button>
             </div>
           </div>

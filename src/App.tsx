@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
+import { apiFetch, setAccessToken } from "@/lib/api";
 import Home from "@/pages/Home";
 import About from "@/pages/About";
 import Directory from "@/pages/Directory";
@@ -32,6 +33,18 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  useEffect(() => {
+    // Attempt auto session restore from httpOnly refresh cookie or access token
+    apiFetch("/api/members/me")
+      .then(member => {
+        setIsLoggedIn(true);
+        setIsAdmin(member.role === "ADMIN" || member.role === "SUPER_ADMIN");
+      })
+      .catch(() => {
+        // Not logged in or session expired
+      });
+  }, []);
+
   const navigate = (page: Page) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -44,6 +57,8 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    apiFetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    setAccessToken(null);
     setIsLoggedIn(false);
     setIsAdmin(false);
     navigate("home");

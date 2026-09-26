@@ -1,77 +1,79 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { apiFetch } from "../lib/api";
+
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface MemberDashboardProps { onNavigate: (page: Page) => void; }
 
-const memberData = {
-  name: "Adaeze Nwachukwu",
-  set: "2005",
-  faculty: "Law",
-  dept: "Private Law",
-  profession: "Senior Counsel",
-  location: "Abuja, FCT",
-  email: "adaeze.nwachukwu@email.com",
-  phone: "+234 803 xxx xxxx",
-  status: "Verified",
-  memberSince: "January 2024",
-  profileCompletion: 78,
-  img: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&auto=format",
-};
-
-const payments = [
-  { id: "PAY-2024-001", desc: "Annual Dues 2024", amount: 5000, status: "Paid", date: "Jan 15, 2024", receipt: true },
-  { id: "PAY-2024-002", desc: "AGM 2024 Registration", amount: 2000, status: "Paid", date: "Nov 20, 2024", receipt: true },
-  { id: "PAY-2024-003", desc: "Annual Dues 2025", amount: 5000, status: "Pending", date: "—", receipt: false },
-  { id: "PAY-2024-004", desc: "Welfare Fund Donation", amount: 10000, status: "Paid", date: "Oct 10, 2024", receipt: true },
-];
-
-const notifications = [
-  { id: 1, type: "payment", title: "Annual Dues Due Soon", body: "Your 2025 annual dues of ₦5,000 are due by December 31, 2024.", time: "2 days ago", read: false },
-  { id: 2, type: "event", title: "AGM 2024 Registration Confirmed", body: "You are registered for the Annual General Meeting on December 14, 2024.", time: "5 days ago", read: false },
-  { id: 3, type: "announcement", title: "New Announcement Posted", body: "Dr. Chukwuemeka Obi (Set 2001) has been appointed Minister of Education.", time: "1 week ago", read: true },
-  { id: 4, type: "welfare", title: "Welfare Request Update", body: "Your welfare enquiry has been assigned to an officer and is under review.", time: "2 weeks ago", read: true },
-];
-
-const upcomingEvents = [
-  { title: "AGM 2024", date: "Dec 14, 2024", venue: "CLU Auditorium" },
-  { title: "Alumni Networking Gala", date: "Jan 18, 2025", venue: "Merit House, Abuja" },
-];
-
 export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "profile" | "payments" | "notifications" | "welfare">("overview");
-  const [notifs, setNotifs] = useState(notifications);
+  const [me, setMe] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    firstName: "",
+    lastName: "",
+    phone: "",
+    profession: "",
+    company: "",
+    bio: "",
+  });
 
-  const unreadCount = notifs.filter(n => !n.read).length;
-  const pendingDues = payments.filter(p => p.status === "Pending").reduce((sum, p) => sum + p.amount, 0);
+  useEffect(() => {
+    setLoading(true);
+    apiFetch("/api/members/me")
+      .then(res => {
+        setMe(res);
+        setProfileForm({
+          firstName: res.firstName || "",
+          lastName: res.lastName || "",
+          phone: res.phone || "",
+          profession: res.profession || "",
+          company: res.company || "",
+          bio: res.bio || "",
+        });
+      })
+      .catch(err => console.error(err))
+      .finally(() => setLoading(false));
+  }, []);
 
-  const markRead = (id: number) => setNotifs(n => n.map(x => x.id === id ? {...x, read: true} : x));
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const updated = await apiFetch("/api/members/me", {
+        method: "PUT",
+        body: JSON.stringify(profileForm),
+      });
+      setMe(updated);
+      alert("Profile updated successfully!");
+    } catch (err: any) {
+      alert(err.message || "Failed to update profile");
+    }
+  };
+
+  const memberName = me ? `${me.firstName || ''} ${me.lastName || ''}`.trim() : "Member";
+  const setName = me?.graduatingSet?.setName || "Alumni";
+  const facName = me?.faculty?.name || "";
+  const profilePhoto = me?.profilePhoto?.url || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&auto=format";
+  const status = me?.verificationStatus || "VERIFIED";
 
   return (
     <div className="bg-[var(--background)] min-h-screen">
       <div className="bg-[var(--secondary)] py-8 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[var(--accent)] flex-shrink-0">
-            <img src={memberData.img} alt={memberData.name} className="w-full h-full object-cover" />
+            <img src={profilePhoto} alt={memberName} className="w-full h-full object-cover" />
           </div>
           <div className="flex-1">
             <p className="text-[var(--accent)] text-xs font-semibold tracking-widest uppercase">Member Dashboard</p>
-            <h1 className="font-display text-2xl font-bold text-white">Welcome, {memberData.name.split(" ")[0]}</h1>
+            <h1 className="font-display text-2xl font-bold text-white">Welcome, {me?.firstName || "Member"}</h1>
             <div className="flex flex-wrap gap-2 mt-1">
-              <span className="text-xs text-white/70">Set {memberData.set} · {memberData.faculty}</span>
-              <span className="px-2 py-0.5 text-[10px] font-semibold bg-green-500 text-white rounded">{memberData.status}</span>
+              <span className="text-xs text-white/70">{setName} {facName ? `· ${facName}` : ''}</span>
+              <span className="px-2 py-0.5 text-[10px] font-semibold bg-green-500 text-white rounded">{status}</span>
             </div>
           </div>
           <div className="flex gap-2">
-            {unreadCount > 0 && (
-              <button onClick={() => setActiveTab("notifications")} className="relative px-4 py-2 bg-white/10 text-white border border-white/20 rounded text-xs font-medium hover:bg-white/20 transition-colors">
-                🔔 Notifications
-                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold">{unreadCount}</span>
-              </button>
-            )}
-            {pendingDues > 0 && (
-              <button onClick={() => setActiveTab("payments")} className="px-4 py-2 bg-[var(--accent)] text-white rounded text-xs font-semibold hover:bg-[var(--primary)] transition-colors">
-                Pay Dues ₦{pendingDues.toLocaleString()}
-              </button>
-            )}
+            <button onClick={() => onNavigate("finance")} className="px-4 py-2 bg-[var(--accent)] text-white rounded text-xs font-semibold hover:bg-[var(--primary)] transition-colors">
+              Manage Dues & Finance
+            </button>
           </div>
         </div>
       </div>
