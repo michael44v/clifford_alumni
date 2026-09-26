@@ -43,6 +43,19 @@ export default function App() {
       .catch(() => {
         // Not logged in or session expired
       });
+
+    const handleSessionExpired = () => {
+      setAccessToken(null);
+      setIsLoggedIn(false);
+      setIsAdmin(false);
+      navigate("login");
+      alert("Your session has expired. Please log in again.");
+    };
+
+    window.addEventListener("cuaa:session-expired", handleSessionExpired);
+    return () => {
+      window.removeEventListener("cuaa:session-expired", handleSessionExpired);
+    };
   }, []);
 
   const navigate = (page: Page) => {
