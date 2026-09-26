@@ -28,18 +28,49 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
   const confirmPayment = async () => {
     if (!payingItem) return;
     try {
-      await apiFetch("/api/finance/pay-dues", {
-        method: "POST",
-        body: JSON.stringify({ duesItemId: payingItem.id }),
-      });
-      alert("Payment processed successfully!");
-      setPayingItem(null);
-      const [duesRes, histRes] = await Promise.all([
-        apiFetch("/api/finance/dues").catch(() => []),
-        apiFetch("/api/finance/history").catch(() => []),
-      ]);
-      setDuesList(Array.isArray(duesRes) ? duesRes : duesRes.data || []);
-      setPaymentHistory(Array.isArray(histRes) ? histRes : histRes.data || []);
+      // Initialize Paystack Inline popup if PaystackPop is available
+      const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_test_sample";
+      if (typeof (window as any).PaystackPop !== "undefined") {
+        const handler = (window as any).PaystackPop.setup({
+          key: paystackKey,
+          email: "member@cliffordalumni.ng",
+          amount: Number(payingItem.amount) * 100, // amount in kobo
+          currency: "NGN",
+          ref: "DUES-" + Math.floor(Math.random() * 1000000000 + 1),
+          callback: async (response: any) => {
+            await apiFetch("/api/finance/pay-dues", {
+              method: "POST",
+              body: JSON.stringify({ duesItemId: payingItem.id }),
+            });
+            alert("Payment successful! Reference: " + response.reference);
+            setPayingItem(null);
+            const [duesRes, histRes] = await Promise.all([
+              apiFetch("/api/finance/dues").catch(() => []),
+              apiFetch("/api/finance/history").catch(() => []),
+            ]);
+            setDuesList(Array.isArray(duesRes) ? duesRes : duesRes.data || []);
+            setPaymentHistory(Array.isArray(histRes) ? histRes : histRes.data || []);
+          },
+          onClose: () => {
+            alert("Payment window closed.");
+          },
+        });
+        handler.openIframe();
+      } else {
+        // Fallback to direct backend API call if inline JS script is blocked
+        await apiFetch("/api/finance/pay-dues", {
+          method: "POST",
+          body: JSON.stringify({ duesItemId: payingItem.id }),
+        });
+        alert("Payment processed successfully!");
+        setPayingItem(null);
+        const [duesRes, histRes] = await Promise.all([
+          apiFetch("/api/finance/dues").catch(() => []),
+          apiFetch("/api/finance/history").catch(() => []),
+        ]);
+        setDuesList(Array.isArray(duesRes) ? duesRes : duesRes.data || []);
+        setPaymentHistory(Array.isArray(histRes) ? histRes : histRes.data || []);
+      }
     } catch (err: any) {
       alert(err.message || "Payment failed");
     }
