@@ -130,7 +130,8 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
                         <p className="font-semibold text-sm text-[var(--foreground)]">{d.title}</p>
                         <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-md ${isPaid ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>{isPaid ? "Paid" : "Pending"}</span>
                       </div>
-                      <p className="text-xs text-[var(--muted-foreground)]">Year: {d.year} · Type: {d.type || "Annual Dues"}</p>
+                      <p className="text-xs text-[var(--muted-foreground)]">Session: {d.academicYear || d.year || "Current Session"} · Type: {d.type || "Annual Dues"}</p>
+                      {d.description && <p className="text-xs text-[var(--muted-foreground)] mt-0.5">{d.description}</p>}
                     </div>
                     <div className="flex items-center gap-4">
                       <p className="font-bold text-lg text-[var(--foreground)]">₦{Number(d.amount).toLocaleString()}</p>
