@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "../lib/api";
 import { showToast } from "../components/Toast";
+import { getKorapayInstance } from "../lib/korapay";
 
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface DonateProps { onNavigate: (page: Page) => void; isLoggedIn: boolean; }
@@ -56,7 +57,6 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
     setLoading(true);
     try {
       const korapayKey = import.meta.env.VITE_KORAPAY_PUBLIC_KEY || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_test_sample";
-      const Korapay = (window as any).Korapay;
 
       const recordDonation = async () => {
         await apiFetch("/api/finance/donate", {
@@ -71,7 +71,8 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
         fetchData();
       };
 
-      if (Korapay && typeof Korapay.initialize === "function") {
+      try {
+        const Korapay = await getKorapayInstance();
         Korapay.initialize({
           key: korapayKey,
           reference: "DON-" + Math.floor(Math.random() * 1000000000 + 1),
@@ -95,7 +96,8 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
             showToast("Donation failed: " + (response?.message || "Transaction uncompleted"), "error");
           },
         });
-      } else {
+      } catch (sdkErr) {
+        console.warn("Korapay SDK load failed, falling back to direct donation endpoint:", sdkErr);
         await recordDonation();
       }
     } catch (err: any) {
@@ -167,7 +169,7 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
                 <span className="text-5xl block mb-3">🎉</span>
                 <p className="font-display text-xl font-bold text-green-800 mb-2">Thank you!</p>
                 <p className="text-sm text-green-700 leading-relaxed mb-2">
-                  Your Paystack donation of <strong>{fmt(finalAmount)}</strong> to <strong>{currentCause?.title}</strong> has been received.
+                  Your Korapay donation of <strong>{fmt(finalAmount)}</strong> to <strong>{currentCause?.title}</strong> has been received.
                 </p>
                 <p className="text-xs text-green-600 mb-4">
                   A payment record and receipt have been generated for your account.
@@ -201,7 +203,7 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
                     <span className="text-[var(--primary)] font-semibold">{currentCause?.title || "General Fund"}</span>
                     {finalAmount > 0 && <span className="ml-2 font-semibold">— {fmt(finalAmount)}</span>}
                   </div>
-                  <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">Paystack</span>
+                  <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">Korapay</span>
                 </div>
 
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -220,7 +222,7 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
                   disabled={finalAmount < 100 || !currentCause}
                   className="w-full py-3 bg-[var(--primary)] text-white font-semibold rounded text-sm hover:bg-[var(--accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {finalAmount >= 100 ? `Donate ${fmt(finalAmount)} via Paystack` : "Enter an amount to continue"}
+                  {finalAmount >= 100 ? `Donate ${fmt(finalAmount)} via Korapay` : "Enter an amount to continue"}
                 </button>
               </form>
             )}
@@ -257,9 +259,9 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
             </div>
 
             <div className="bg-white border border-[var(--border)] rounded p-5">
-              <p className="text-xs font-semibold text-[var(--foreground)] mb-2">🔒 Paystack Secure Gateway</p>
+              <p className="text-xs font-semibold text-[var(--foreground)] mb-2">🔒 Korapay Secure Gateway</p>
               <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
-                All donations are processed securely via Paystack. Every transaction generates a receipt with a unique transaction reference and payment confirmation.
+                All donations are processed securely via Korapay. Every transaction generates a receipt with a unique transaction reference and payment confirmation.
               </p>
             </div>
           </div>
