@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { apiFetch } from "../lib/api";
 import { showToast } from "../components/Toast";
 import { TableRowSkeleton, CardSkeleton } from "../components/Skeleton";
+import { getKorapayInstance } from "../lib/korapay";
 
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface FinanceProps { onNavigate: (page: Page) => void; isLoggedIn: boolean; }
@@ -30,9 +31,7 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
   const confirmPayment = async () => {
     if (!payingItem) return;
     try {
-      // Initialize Korapay Checkout
       const korapayKey = import.meta.env.VITE_KORAPAY_PUBLIC_KEY || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_test_sample";
-      const Korapay = (window as any).Korapay;
 
       const refreshData = async () => {
         const [duesRes, histRes] = await Promise.all([
@@ -53,7 +52,8 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
         await refreshData();
       };
 
-      if (Korapay && typeof Korapay.initialize === "function") {
+      try {
+        const Korapay = await getKorapayInstance();
         Korapay.initialize({
           key: korapayKey,
           reference: "DUES-" + Math.floor(Math.random() * 1000000000 + 1),
@@ -77,8 +77,8 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
             showToast("Payment failed: " + (response?.message || "Transaction uncompleted"), "error");
           },
         });
-      } else {
-        // Fallback to direct backend API call if inline JS script is blocked
+      } catch (sdkErr) {
+        console.warn("Korapay SDK load failed, falling back to direct payment endpoint:", sdkErr);
         await recordPayment();
       }
     } catch (err: any) {
