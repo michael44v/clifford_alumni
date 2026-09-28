@@ -16,7 +16,7 @@ const createDuesSchema = z.object({
 });
 
 const payDuesSchema = z.object({
-  duesItemId: z.string().uuid(),
+  duesItemId: z.string().min(1),
   paymentMethod: z.nativeEnum(PaymentMethod).optional(),
 });
 
