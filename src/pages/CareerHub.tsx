@@ -11,6 +11,7 @@ export default function CareerHub({ onNavigate, isLoggedIn }: CareerHubProps) {
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showPostModal, setShowPostModal] = useState(false);
+  const [editingJob, setEditingJob] = useState<any | null>(null);
   const [newPost, setNewPost] = useState({ title: "", content: "", category: "Career" });
 
   useEffect(() => {
@@ -27,17 +28,38 @@ export default function CareerHub({ onNavigate, isLoggedIn }: CareerHubProps) {
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await apiFetch("/api/community/posts", {
-        method: "POST",
-        body: JSON.stringify(newPost),
-      });
-      alert("Post created successfully!");
+      if (editingJob) {
+        await apiFetch(`/api/community/posts/${editingJob.id}`, {
+          method: "PUT",
+          body: JSON.stringify(newPost),
+        });
+        alert("Opportunity post updated successfully!");
+      } else {
+        await apiFetch("/api/community/posts", {
+          method: "POST",
+          body: JSON.stringify(newPost),
+        });
+        alert("Post created successfully!");
+      }
       setShowPostModal(false);
+      setEditingJob(null);
       setNewPost({ title: "", content: "", category: "Career" });
       const res = await apiFetch("/api/community/posts");
       setPosts(res.data || []);
     } catch (err: any) {
-      alert(err.message || "Failed to create post");
+      alert(err.message || "Failed to save post");
+    }
+  };
+
+  const handleDeletePost = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this opportunity post?")) return;
+    try {
+      await apiFetch(`/api/community/posts/${id}`, { method: "DELETE" });
+      alert("Post deleted successfully.");
+      const res = await apiFetch("/api/community/posts");
+      setPosts(res.data || []);
+    } catch (err: any) {
+      alert(err.message || "Failed to delete post");
     }
   };
 
@@ -101,6 +123,25 @@ export default function CareerHub({ onNavigate, isLoggedIn }: CareerHubProps) {
                           <p className="text-sm text-[var(--muted-foreground)] leading-relaxed mt-2 whitespace-pre-wrap">{job.content}</p>
                           <p className="text-xs text-[var(--muted-foreground)] mt-3">Posted by: <span className="text-[var(--foreground)] font-medium">{authorName}</span></p>
                         </div>
+
+                        <div className="flex sm:flex-col gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => {
+                              setEditingJob(job);
+                              setNewPost({ title: job.title, content: job.content, category: job.category || "Career" });
+                              setShowPostModal(true);
+                            }}
+                            className="px-3 py-1 border border-[var(--border)] rounded text-xs font-semibold hover:border-[var(--primary)] text-[var(--foreground)]"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeletePost(job.id)}
+                            className="px-3 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold hover:bg-red-200"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -122,7 +163,7 @@ export default function CareerHub({ onNavigate, isLoggedIn }: CareerHubProps) {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowPostModal(false)}>
           <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-display text-xl font-bold text-[var(--secondary)]">Post Opportunity</h3>
+              <h3 className="font-display text-xl font-bold text-[var(--secondary)]">{editingJob ? "Edit Opportunity Post" : "Post Opportunity"}</h3>
               <button onClick={() => setShowPostModal(false)} className="text-lg">✕</button>
             </div>
             <form onSubmit={handleCreatePost} className="space-y-4">

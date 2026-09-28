@@ -79,6 +79,64 @@ router.post("/posts", authenticateJWT, requireVerifiedAlumni, validateBody(creat
   }
 });
 
+// PUT /api/community/posts/:id (Update discussion/job post)
+router.put("/posts/:id", authenticateJWT, requireVerifiedAlumni, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const postId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const post = await prisma.discussionPost.findUnique({ where: { id: postId } });
+
+    if (!post) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    const isAdmin = req.user!.role === "ADMIN" || req.user!.role === "SUPER_ADMIN" || req.user!.role === "CONTENT_ADMIN";
+    if (post.authorId !== req.user!.userId && !isAdmin) {
+      return res.status(403).json({ error: "Unauthorized to edit this post" });
+    }
+
+    const { title, content, category } = req.body;
+    const updated = await prisma.discussionPost.update({
+      where: { id: postId },
+      data: {
+        ...(title && { title }),
+        ...(content && { content }),
+        ...(category && { category }),
+      },
+      include: {
+        author: { select: { id: true, firstName: true, lastName: true, profilePhoto: true } },
+      },
+    });
+
+    return res.json(updated);
+  } catch (err) {
+    console.error("Update post error:", err);
+    return res.status(500).json({ error: "Failed to update post" });
+  }
+});
+
+// DELETE /api/community/posts/:id (Delete discussion/job post)
+router.delete("/posts/:id", authenticateJWT, requireVerifiedAlumni, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const postId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const post = await prisma.discussionPost.findUnique({ where: { id: postId } });
+
+    if (!post) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+
+    const isAdmin = req.user!.role === "ADMIN" || req.user!.role === "SUPER_ADMIN" || req.user!.role === "CONTENT_ADMIN";
+    if (post.authorId !== req.user!.userId && !isAdmin) {
+      return res.status(403).json({ error: "Unauthorized to delete this post" });
+    }
+
+    await prisma.discussionPost.delete({ where: { id: postId } });
+    return res.json({ message: "Post deleted successfully" });
+  } catch (err) {
+    console.error("Delete post error:", err);
+    return res.status(500).json({ error: "Failed to delete post" });
+  }
+});
+
 // POST /api/community/posts/:id/comments
 router.post("/posts/:id/comments", authenticateJWT, requireVerifiedAlumni, validateBody(createCommentSchema), async (req: AuthenticatedRequest, res: Response) => {
   try {

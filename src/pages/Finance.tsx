@@ -28,9 +28,9 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
   const confirmPayment = async () => {
     if (!payingItem) return;
     try {
-      // Initialize Paystack Inline popup if PaystackPop is available
-      const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_test_sample";
-      const PaystackPop = (window as any).PaystackPop;
+      // Initialize Korapay Checkout
+      const korapayKey = import.meta.env.VITE_KORAPAY_PUBLIC_KEY || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_test_sample";
+      const Korapay = (window as any).Korapay;
 
       const refreshData = async () => {
         const [duesRes, histRes] = await Promise.all([
@@ -46,51 +46,35 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
           method: "POST",
           body: JSON.stringify({ duesItemId: payingItem.id }),
         });
-        alert("Payment successful! Reference: " + (response?.reference || response?.trxref || "SUCCESS"));
+        alert("Payment successful via Korapay! Reference: " + (response?.reference || response?.checkout_reference || "SUCCESS"));
         setPayingItem(null);
         await refreshData();
       };
 
-      if (PaystackPop) {
-        // IMPORTANT: Paystack's v1 inline.js validates callback/onClose with
-        // Object.prototype.toString.call(fn) === "[object Function]". An
-        // `async` function fails that check (it reports as [object AsyncFunction])
-        // and throws "Attribute callback must be a valid function". So these
-        // handlers passed to Paystack must be plain, non-async functions —
-        // any async work happens inside a call to an async helper instead.
-        const handleSuccess = function (response: any) {
-          recordPayment(response);
-        };
-
-        const handleClose = function () {
-          alert("Payment window closed.");
-        };
-
-        const baseConfig = {
-          key: paystackKey,
-          email: "member@cliffordalumni.ng",
-          amount: Number(payingItem.amount) * 100, // amount in kobo
+      if (Korapay && typeof Korapay.initialize === "function") {
+        Korapay.initialize({
+          key: korapayKey,
+          reference: "DUES-" + Math.floor(Math.random() * 1000000000 + 1),
+          amount: Number(payingItem.amount),
           currency: "NGN",
-          ref: "DUES-" + Math.floor(Math.random() * 1000000000 + 1),
-        };
-
-        if (typeof PaystackPop.setup === "function") {
-          // Popup V1 API — uses callback / onClose (both must be plain functions)
-          const handler = PaystackPop.setup({
-            ...baseConfig,
-            callback: handleSuccess,
-            onClose: handleClose,
-          });
-          handler.openIframe();
-        } else {
-          // Popup V2 API — uses onSuccess / onCancel (no "callback" key)
-          const paystack = new PaystackPop();
-          paystack.newTransaction({
-            ...baseConfig,
-            onSuccess: handleSuccess,
-            onCancel: handleClose,
-          });
-        }
+          customer: {
+            name: "CUAA Member",
+            email: "member@cliffordalumni.ng",
+          },
+          information: {
+            title: payingItem.title,
+            description: payingItem.description || "Annual Dues Payment",
+          },
+          onSuccess: function (response: any) {
+            recordPayment(response);
+          },
+          onClose: function () {
+            alert("Korapay payment window closed.");
+          },
+          onFailed: function (response: any) {
+            alert("Payment failed: " + (response?.message || "Transaction uncompleted"));
+          },
+        });
       } else {
         // Fallback to direct backend API call if inline JS script is blocked
         await recordPayment();

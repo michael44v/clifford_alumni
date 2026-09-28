@@ -58,11 +58,9 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
       .then(res => setShowcasePhotos(Array.isArray(res) ? res : []))
       .catch(() => setShowcasePhotos([]));
 
-    if (isLoggedIn) {
-      apiFetch("/api/members/directory?limit=4")
-        .then(res => setFeaturedAlumni(res.data || []))
-        .catch(() => setFeaturedAlumni([]));
-    }
+    apiFetch("/api/members/featured")
+      .then(res => setFeaturedAlumni(Array.isArray(res) ? res : []))
+      .catch(() => setFeaturedAlumni([]));
   }, [isLoggedIn]);
   return (
     <div>
