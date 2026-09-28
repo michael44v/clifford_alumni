@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
+import ToastContainer, { showToast } from "@/components/Toast";
 import { apiFetch, setAccessToken } from "@/lib/api";
 import Home from "@/pages/Home";
 import About from "@/pages/About";
@@ -49,7 +50,7 @@ export default function App() {
       setIsLoggedIn(false);
       setIsAdmin(false);
       navigate("login");
-      alert("Your session has expired. Please log in again.");
+      showToast("Your session has expired. Please log in again.", "error");
     };
 
     window.addEventListener("cuaa:session-expired", handleSessionExpired);
@@ -115,6 +116,7 @@ export default function App() {
       </main>
 
       {showFooter && <Footer onNavigate={navigate} />}
+      <ToastContainer />
     </div>
   );
 }

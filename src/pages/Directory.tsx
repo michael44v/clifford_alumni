@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "../lib/api";
+import { GridSkeleton } from "../components/Skeleton";
 
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface DirectoryProps { onNavigate: (page: Page) => void; isLoggedIn: boolean; }
@@ -100,7 +101,7 @@ export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
         </p>
 
         {loading ? (
-          <div className="text-center py-12 text-[var(--muted-foreground)]">Loading directory...</div>
+          <GridSkeleton count={8} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filtered.map((alum) => {

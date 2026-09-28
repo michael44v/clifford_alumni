@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "../lib/api";
+import { showToast } from "../components/Toast";
 
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface DonateProps { onNavigate: (page: Page) => void; isLoggedIn: boolean; }
@@ -88,17 +89,17 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
             recordDonation();
           },
           onClose: function () {
-            alert("Korapay donation window closed.");
+            showToast("Korapay donation window closed.", "info");
           },
           onFailed: function (response: any) {
-            alert("Donation failed: " + (response?.message || "Transaction uncompleted"));
+            showToast("Donation failed: " + (response?.message || "Transaction uncompleted"), "error");
           },
         });
       } else {
         await recordDonation();
       }
     } catch (err: any) {
-      alert(err.message || "Donation failed");
+      showToast(err.message || "Donation failed", "error");
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "../lib/api";
+import { showToast } from "../components/Toast";
+import { CardSkeleton } from "../components/Skeleton";
 
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface CareerHubProps { onNavigate: (page: Page) => void; isLoggedIn: boolean; }
@@ -33,13 +35,13 @@ export default function CareerHub({ onNavigate, isLoggedIn }: CareerHubProps) {
           method: "PUT",
           body: JSON.stringify(newPost),
         });
-        alert("Opportunity post updated successfully!");
+        showToast("Opportunity post updated successfully!", "success");
       } else {
         await apiFetch("/api/community/posts", {
           method: "POST",
           body: JSON.stringify(newPost),
         });
-        alert("Post created successfully!");
+        showToast("Post created successfully!", "success");
       }
       setShowPostModal(false);
       setEditingJob(null);
@@ -47,19 +49,18 @@ export default function CareerHub({ onNavigate, isLoggedIn }: CareerHubProps) {
       const res = await apiFetch("/api/community/posts");
       setPosts(res.data || []);
     } catch (err: any) {
-      alert(err.message || "Failed to save post");
+      showToast(err.message || "Failed to save post", "error");
     }
   };
 
   const handleDeletePost = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this opportunity post?")) return;
     try {
       await apiFetch(`/api/community/posts/${id}`, { method: "DELETE" });
-      alert("Post deleted successfully.");
+      showToast("Post deleted successfully.", "info");
       const res = await apiFetch("/api/community/posts");
       setPosts(res.data || []);
     } catch (err: any) {
-      alert(err.message || "Failed to delete post");
+      showToast(err.message || "Failed to delete post", "error");
     }
   };
 
@@ -95,7 +96,10 @@ export default function CareerHub({ onNavigate, isLoggedIn }: CareerHubProps) {
             </div>
 
             {loading ? (
-              <div className="text-center py-12 text-[var(--muted-foreground)]">Loading career opportunities...</div>
+              <div className="space-y-4">
+                <CardSkeleton />
+                <CardSkeleton />
+              </div>
             ) : !isLoggedIn ? (
               <div className="text-center py-12 text-[var(--muted-foreground)] bg-white rounded border border-[var(--border)]">
                 <p className="font-semibold mb-2">Sign in to view career opportunities</p>

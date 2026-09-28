@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "../lib/api";
+import { showToast } from "../components/Toast";
 
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface MemberDashboardProps { onNavigate: (page: Page) => void; }
@@ -65,9 +66,9 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
         body: JSON.stringify(profileForm),
       });
       setMe(updated);
-      alert("Profile updated successfully!");
+      showToast("Profile updated successfully!", "success");
     } catch (err: any) {
-      alert(err.message || "Failed to update profile");
+      showToast(err.message || "Failed to update profile", "error");
     }
   };
 
