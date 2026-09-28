@@ -1,11 +1,10 @@
 /**
- * Utility to dynamically load Korapay Checkout Inline JS SDK if not already loaded.
+ * Utility to dynamically load Korapay Checkout Inline JS SDK.
  */
 
 const KORAPAY_SCRIPT_URLS = [
-  "https://koraredirect.com/korapay/v1/inline.js",
-  "https://korapay.com/korapay/v1/inline.js",
-  "https://korabounty.com/korapay/v1/inline.js",
+  "https://korablobstorage.blob.core.windows.net/modal-bucket/korapay-collections.min.js",
+  "https://checkout.korapay.com/v1/inline.js",
 ];
 
 export function getKorapayInstance(): Promise<any> {
@@ -18,16 +17,10 @@ export function getKorapayInstance(): Promise<any> {
 
     function tryLoadNextScript() {
       if (attemptedIndex >= KORAPAY_SCRIPT_URLS.length) {
-        return reject(new Error("Unable to load Korapay Checkout SDK. Please check internet connection or script blocking."));
+        return reject(new Error("Unable to load Korapay Payment Gateway SDK. Please check your internet connection."));
       }
 
       const scriptUrl = KORAPAY_SCRIPT_URLS[attemptedIndex++];
-
-      // Check if script element already exists
-      const existingScript = document.querySelector(`script[src="${scriptUrl}"]`);
-      if (existingScript) {
-        existingScript.remove();
-      }
 
       const script = document.createElement("script");
       script.src = scriptUrl;
