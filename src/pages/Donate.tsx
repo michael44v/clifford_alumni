@@ -56,7 +56,12 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
     if (!currentCause || finalAmount < 100) return;
     setLoading(true);
     try {
-      const korapayKey = import.meta.env.VITE_KORAPAY_PUBLIC_KEY || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_test_sample";
+      const korapayKey = import.meta.env.VITE_KORAPAY_PUBLIC_KEY || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+      if (!korapayKey) {
+        showToast("Korapay Public Key is missing. Please configure VITE_KORAPAY_PUBLIC_KEY in your .env file.", "error");
+        setLoading(false);
+        return;
+      }
 
       const recordDonation = async () => {
         await apiFetch("/api/finance/donate", {
@@ -71,37 +76,36 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
         fetchData();
       };
 
-      try {
-        const Korapay = await getKorapayInstance();
-        Korapay.initialize({
-          key: korapayKey,
-          reference: "DON-" + Math.floor(Math.random() * 1000000000 + 1),
-          amount: finalAmount,
-          currency: "NGN",
-          customer: {
-            name: "CUAA Donor",
-            email: "donor@cliffordalumni.ng",
-          },
-          information: {
-            title: currentCause.title,
-            description: "Alumni Donation",
-          },
-          onSuccess: function (response: any) {
-            recordDonation();
-          },
-          onClose: function () {
-            showToast("Korapay donation window closed.", "info");
-          },
-          onFailed: function (response: any) {
-            showToast("Donation failed: " + (response?.message || "Transaction uncompleted"), "error");
-          },
-        });
-      } catch (sdkErr) {
-        console.warn("Korapay SDK load failed, falling back to direct donation endpoint:", sdkErr);
-        await recordDonation();
+      const Korapay = await getKorapayInstance();
+      if (!Korapay || typeof Korapay.initialize !== "function") {
+        throw new Error("Korapay Payment Gateway SDK is not initialized properly.");
       }
+
+      Korapay.initialize({
+        key: korapayKey,
+        reference: "DON-" + Math.floor(Math.random() * 1000000000 + 1),
+        amount: finalAmount,
+        currency: "NGN",
+        customer: {
+          name: "CUAA Donor",
+          email: "donor@cliffordalumni.ng",
+        },
+        information: {
+          title: currentCause.title,
+          description: "Alumni Donation",
+        },
+        onSuccess: function (response: any) {
+          recordDonation();
+        },
+        onClose: function () {
+          showToast("Korapay donation window closed.", "info");
+        },
+        onFailed: function (response: any) {
+          showToast("Donation failed: " + (response?.message || "Transaction uncompleted"), "error");
+        },
+      });
     } catch (err: any) {
-      showToast(err.message || "Donation failed", "error");
+      showToast(err.message || "Failed to launch payment gateway", "error");
     } finally {
       setLoading(false);
     }

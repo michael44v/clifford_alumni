@@ -31,7 +31,11 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
   const confirmPayment = async () => {
     if (!payingItem) return;
     try {
-      const korapayKey = import.meta.env.VITE_KORAPAY_PUBLIC_KEY || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_test_sample";
+      const korapayKey = import.meta.env.VITE_KORAPAY_PUBLIC_KEY || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+      if (!korapayKey) {
+        showToast("Korapay Public Key is missing. Please configure VITE_KORAPAY_PUBLIC_KEY in your .env file.", "error");
+        return;
+      }
 
       const refreshData = async () => {
         const [duesRes, histRes] = await Promise.all([
@@ -52,37 +56,36 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
         await refreshData();
       };
 
-      try {
-        const Korapay = await getKorapayInstance();
-        Korapay.initialize({
-          key: korapayKey,
-          reference: "DUES-" + Math.floor(Math.random() * 1000000000 + 1),
-          amount: Number(payingItem.amount),
-          currency: "NGN",
-          customer: {
-            name: "CUAA Member",
-            email: "member@cliffordalumni.ng",
-          },
-          information: {
-            title: payingItem.title,
-            description: payingItem.description || "Annual Dues Payment",
-          },
-          onSuccess: function (response: any) {
-            recordPayment(response);
-          },
-          onClose: function () {
-            showToast("Korapay payment window closed.", "info");
-          },
-          onFailed: function (response: any) {
-            showToast("Payment failed: " + (response?.message || "Transaction uncompleted"), "error");
-          },
-        });
-      } catch (sdkErr) {
-        console.warn("Korapay SDK load failed, falling back to direct payment endpoint:", sdkErr);
-        await recordPayment();
+      const Korapay = await getKorapayInstance();
+      if (!Korapay || typeof Korapay.initialize !== "function") {
+        throw new Error("Korapay Payment Gateway SDK is not initialized properly.");
       }
+
+      Korapay.initialize({
+        key: korapayKey,
+        reference: "DUES-" + Math.floor(Math.random() * 1000000000 + 1),
+        amount: Number(payingItem.amount),
+        currency: "NGN",
+        customer: {
+          name: "CUAA Member",
+          email: "member@cliffordalumni.ng",
+        },
+        information: {
+          title: payingItem.title,
+          description: payingItem.description || "Annual Dues / Levy Payment",
+        },
+        onSuccess: function (response: any) {
+          recordPayment(response);
+        },
+        onClose: function () {
+          showToast("Korapay payment window closed.", "info");
+        },
+        onFailed: function (response: any) {
+          showToast("Payment failed: " + (response?.message || "Transaction uncompleted"), "error");
+        },
+      });
     } catch (err: any) {
-      showToast(err.message || "Payment failed", "error");
+      showToast(err.message || "Failed to launch payment gateway", "error");
     }
   };
 
