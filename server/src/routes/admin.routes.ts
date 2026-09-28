@@ -151,15 +151,72 @@ router.get("/leadership", async (req, res) => {
 });
 
 // POST /api/admin/leadership
-router.post("/leadership", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "CONTENT_ADMIN"), validateBody(leadershipSchema), async (req: AuthenticatedRequest, res: Response) => {
+router.post("/leadership", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "CONTENT_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const { photoUrl, ...leaderData } = req.body;
+    let photoMediaId = leaderData.photoMediaId;
+
+    if (photoUrl) {
+      const media = await prisma.media.create({
+        data: {
+          cloudinaryPublicId: `exco-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+          secureUrl: photoUrl,
+          folder: "exco",
+        },
+      });
+      photoMediaId = media.id;
+    }
+
     const leader = await prisma.leadershipProfile.create({
-      data: req.body,
+      data: {
+        ...leaderData,
+        termStart: Number(leaderData.termStart) || new Date().getFullYear(),
+        photoMediaId,
+      },
       include: { photo: true },
     });
+
     return res.status(201).json(leader);
   } catch (err) {
+    console.error("Create leadership error:", err);
     return res.status(500).json({ error: "Failed to create leadership profile" });
+  }
+});
+
+// PUT /api/admin/leadership/:id (Update EXCO profile & image)
+router.put("/leadership/:id", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "CONTENT_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const { photoUrl, ...leaderData } = req.body;
+    let photoMediaId = leaderData.photoMediaId;
+
+    if (photoUrl) {
+      const media = await prisma.media.create({
+        data: {
+          cloudinaryPublicId: `exco-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+          secureUrl: photoUrl,
+          folder: "exco",
+        },
+      });
+      photoMediaId = media.id;
+    }
+
+    const updated = await prisma.leadershipProfile.update({
+      where: { id },
+      data: {
+        ...(leaderData.name && { name: leaderData.name }),
+        ...(leaderData.position && { position: leaderData.position }),
+        ...(leaderData.biography && { biography: leaderData.biography }),
+        ...(leaderData.termStart && { termStart: Number(leaderData.termStart) }),
+        ...(photoMediaId && { photoMediaId }),
+      },
+      include: { photo: true },
+    });
+
+    return res.json(updated);
+  } catch (err) {
+    console.error("Update leadership error:", err);
+    return res.status(500).json({ error: "Failed to update leadership profile" });
   }
 });
 
