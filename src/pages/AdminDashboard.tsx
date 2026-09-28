@@ -110,6 +110,18 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     fetchData();
   }, [memberSearch, memberFilterStatus, rosterSearch]);
 
+  const handleToggleFeaturedMember = async (m: any) => {
+    try {
+      await apiFetch(`/api/admin/members/${m.id}/featured`, {
+        method: "PUT",
+        body: JSON.stringify({ isFeatured: !m.isFeatured }),
+      });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to update featured status");
+    }
+  };
+
   const updateMemberStatus = async (id: string, verificationStatus: string) => {
     try {
       await apiFetch(`/api/admin/members/${id}`, {
@@ -648,7 +660,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                     <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Email / Phone</th>
                     <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Matric / Type</th>
                     <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Status</th>
-                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Alumni of Week</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Featured / AOTW</th>
                     <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Actions</th>
                   </tr>
                 </thead>
@@ -664,16 +676,29 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                         </span>
                       </td>
                       <td className="p-3" onClick={e => e.stopPropagation()}>
-                        {m.isAlumniOfWeek ? (
-                          <div className="flex items-center gap-1 text-amber-600 font-bold">
-                            <span>🏆 Active</span>
-                            <button onClick={() => handleUnsetAlumniOfWeek(m)} className="text-[10px] text-red-500 underline ml-1">Remove</button>
-                          </div>
-                        ) : (
-                          <button onClick={() => { setShowAOTWModal(m); setAotwBio(m.alumniOfWeekBio || m.bio || ""); }} className="px-2 py-1 bg-amber-50 border border-amber-300 text-amber-800 rounded text-[10px] font-semibold hover:bg-amber-100">
-                            Set as AOTW
+                        <div className="flex flex-col gap-1 items-start">
+                          <button
+                            onClick={() => handleToggleFeaturedMember(m)}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              m.isFeatured
+                                ? "bg-purple-100 text-purple-700 border border-purple-300"
+                                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                            }`}
+                          >
+                            {m.isFeatured ? "⭐ Featured" : "+ Feature"}
                           </button>
-                        )}
+
+                          {m.isAlumniOfWeek ? (
+                            <div className="flex items-center gap-1 text-amber-600 font-bold text-[10px]">
+                              <span>🏆 AOTW</span>
+                              <button onClick={() => handleUnsetAlumniOfWeek(m)} className="text-[10px] text-red-500 underline">Unset</button>
+                            </div>
+                          ) : (
+                            <button onClick={() => { setShowAOTWModal(m); setAotwBio(m.alumniOfWeekBio || m.bio || ""); }} className="px-2 py-0.5 bg-amber-50 border border-amber-300 text-amber-800 rounded text-[10px] font-semibold hover:bg-amber-100">
+                              Set AOTW
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="p-3" onClick={e => e.stopPropagation()}>
                         <div className="flex gap-1">

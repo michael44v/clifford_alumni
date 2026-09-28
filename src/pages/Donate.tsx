@@ -54,8 +54,8 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
     if (!currentCause || finalAmount < 100) return;
     setLoading(true);
     try {
-      const paystackKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_test_sample";
-      const PaystackPop = (window as any).PaystackPop;
+      const korapayKey = import.meta.env.VITE_KORAPAY_PUBLIC_KEY || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "pk_test_sample";
+      const Korapay = (window as any).Korapay;
 
       const recordDonation = async () => {
         await apiFetch("/api/finance/donate", {
@@ -63,53 +63,38 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
           body: JSON.stringify({
             donationCampaignId: currentCause.id,
             amount: finalAmount,
-            paymentMethod: "PAYSTACK",
+            paymentMethod: "KORAPAY",
           }),
         });
         setSubmitted(true);
         fetchData();
       };
 
-      // IMPORTANT: Paystack's v1 inline.js validates callback/onClose with
-      // Object.prototype.toString.call(fn) === "[object Function]". An
-      // `async` function fails that check (it reports as [object AsyncFunction])
-      // and throws "Attribute callback must be a valid function". So these
-      // handlers passed to Paystack must be plain, non-async functions —
-      // any async work happens inside a .then()/void-wrapped call.
-      const handleSuccess = function (response: any) {
-        recordDonation();
-      };
-
-      const handleClose = function () {
-        alert("Donation payment window closed.");
-      };
-
-      const baseConfig = {
-        key: paystackKey,
-        email: "donor@cliffordalumni.ng",
-        amount: finalAmount * 100, // amount in kobo
-        currency: "NGN",
-        ref: "DON-" + Math.floor(Math.random() * 1000000000 + 1),
-      };
-
-      if (PaystackPop && typeof PaystackPop.setup === "function") {
-        // Popup V1 API — uses callback / onClose (both must be plain functions)
-        const handler = PaystackPop.setup({
-          ...baseConfig,
-          callback: handleSuccess,
-          onClose: handleClose,
-        });
-        handler.openIframe();
-      } else if (PaystackPop) {
-        // Popup V2 API — uses onSuccess / onCancel (no "callback" key)
-        const paystack = new PaystackPop();
-        paystack.newTransaction({
-          ...baseConfig,
-          onSuccess: handleSuccess,
-          onCancel: handleClose,
+      if (Korapay && typeof Korapay.initialize === "function") {
+        Korapay.initialize({
+          key: korapayKey,
+          reference: "DON-" + Math.floor(Math.random() * 1000000000 + 1),
+          amount: finalAmount,
+          currency: "NGN",
+          customer: {
+            name: "CUAA Donor",
+            email: "donor@cliffordalumni.ng",
+          },
+          information: {
+            title: currentCause.title,
+            description: "Alumni Donation",
+          },
+          onSuccess: function (response: any) {
+            recordDonation();
+          },
+          onClose: function () {
+            alert("Korapay donation window closed.");
+          },
+          onFailed: function (response: any) {
+            alert("Donation failed: " + (response?.message || "Transaction uncompleted"));
+          },
         });
       } else {
-        // Paystack script not loaded — fall back to recording the donation directly
         await recordDonation();
       }
     } catch (err: any) {

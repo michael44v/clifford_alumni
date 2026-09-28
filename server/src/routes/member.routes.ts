@@ -22,6 +22,37 @@ const updateProfileSchema = z.object({
   privacySettings: z.record(z.boolean()).optional(),
 });
 
+// GET /api/members/featured (Public - Featured Alumni for Landing Page)
+router.get("/featured", async (req, res) => {
+  try {
+    let featured = await prisma.member.findMany({
+      where: { isFeatured: true, verificationStatus: "VERIFIED", deletedAt: null },
+      take: 4,
+      include: { graduatingSet: true, faculty: true, location: true, profilePhoto: true },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    // If less than 4 featured, complement with recent verified alumni
+    if (featured.length < 4) {
+      const existingIds = featured.map(m => m.id);
+      const remaining = 4 - featured.length;
+      const recent = await prisma.member.findMany({
+        where: { id: { notIn: existingIds }, verificationStatus: "VERIFIED", deletedAt: null, role: "MEMBER" },
+        take: remaining,
+        include: { graduatingSet: true, faculty: true, location: true, profilePhoto: true },
+        orderBy: { createdAt: "desc" },
+      });
+      featured = [...featured, ...recent];
+    }
+
+    const safeMembers = featured.map(({ passwordHash, ...m }) => m);
+    return res.json(safeMembers);
+  } catch (err) {
+    console.error("Fetch featured members error:", err);
+    return res.status(500).json({ error: "Failed to fetch featured members" });
+  }
+});
+
 // GET /api/members/alumni-of-the-week (Public)
 router.get("/alumni-of-the-week", async (req, res) => {
   try {

@@ -189,13 +189,16 @@ router.get("/members/:id/details", authenticateJWT, requireRole("ADMIN", "SUPER_
   }
 });
 
-// GET /api/admin/members (View all alumni members)
+// GET /api/admin/members (View all alumni members - excludes admin accounts)
 router.get("/members", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "EXCO_ADMIN", "MODERATOR"), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const search = (req.query.search as string) || "";
     const status = (req.query.status as string) || "";
 
-    const whereClause: any = { deletedAt: null };
+    const whereClause: any = {
+      deletedAt: null,
+      role: { notIn: ["ADMIN", "SUPER_ADMIN"] },
+    };
     if (status) {
       whereClause.verificationStatus = status;
     }
@@ -227,10 +230,20 @@ router.get("/members", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "EXC
   }
 });
 
-// PUT /api/admin/members/:id (Modify member status, role, or details)
+// PUT /api/admin/members/:id (Modify member status, role, or details - Admin accounts cannot be modified/suspended)
 router.put("/members/:id", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "EXCO_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const memberId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+
+    // Verify target member is not an admin
+    const targetMember = await prisma.member.findUnique({ where: { id: memberId } });
+    if (!targetMember) {
+      return res.status(404).json({ error: "Member not found" });
+    }
+    if (targetMember.role === "ADMIN" || targetMember.role === "SUPER_ADMIN") {
+      return res.status(403).json({ error: "Admin accounts cannot be modified or suspended." });
+    }
+
     const { verificationStatus, role, firstName, lastName, email, phone, profession, company } = req.body;
 
     const updated = await prisma.member.update({
@@ -256,6 +269,26 @@ router.put("/members/:id", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", 
   } catch (err) {
     console.error("Admin update member error:", err);
     return res.status(500).json({ error: "Failed to update member" });
+  }
+});
+
+// PUT /api/admin/members/:id/featured (Toggle Featured Alumni on Landing Page)
+router.put("/members/:id/featured", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN", "CONTENT_ADMIN", "EXCO_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const memberId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const { isFeatured } = req.body;
+
+    const updated = await prisma.member.update({
+      where: { id: memberId },
+      data: { isFeatured: Boolean(isFeatured) },
+      include: { graduatingSet: true, faculty: true, profilePhoto: true },
+    });
+
+    const { passwordHash, ...safeMember } = updated;
+    return res.json(safeMember);
+  } catch (err) {
+    console.error("Toggle featured member error:", err);
+    return res.status(500).json({ error: "Failed to update featured status for member" });
   }
 });
 

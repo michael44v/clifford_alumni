@@ -54,6 +54,7 @@ enum PaymentMethod {
   FLUTTERWAVE
   BANK_TRANSFER
   CASH
+  KORAPAY
 }
 
 enum DuesType {
@@ -239,6 +240,7 @@ model Member {
 
   isAlumniOfWeek  Boolean   @default(false)
   alumniOfWeekBio String?
+  isFeatured      Boolean   @default(false)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
