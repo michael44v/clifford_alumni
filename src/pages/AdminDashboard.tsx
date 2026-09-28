@@ -32,6 +32,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [rosterSearch, setRosterSearch] = useState("");
 
   // Modals state
+  const [showSetModal, setShowSetModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
   const [showNewsModal, setShowNewsModal] = useState(false);
   const [showLeadershipModal, setShowLeadershipModal] = useState(false);
@@ -54,6 +55,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [isAdminSubmitting, setIsAdminSubmitting] = useState(false);
 
   // Forms
+  const [setForm, setSetForm] = useState({ setName: "", graduationYear: new Date().getFullYear(), description: "" });
   const [eventForm, setEventForm] = useState({ title: "", description: "", date: "", time: "", venue: "", category: "General", organizer: "CUAA" });
   const [newsForm, setNewsForm] = useState({ title: "", content: "", category: "OFFICIAL_ANNOUNCEMENT" });
   const [leadershipForm, setLeadershipForm] = useState({ name: "", position: "", biography: "", termStart: new Date().getFullYear() });
@@ -344,6 +346,37 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     }
   };
 
+  const handleCreateSet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await apiFetch("/api/admin/sets", {
+        method: "POST",
+        body: JSON.stringify({
+          setName: setForm.setName,
+          graduationYear: Number(setForm.graduationYear),
+          description: setForm.description,
+        }),
+      });
+      alert("Graduating set created successfully!");
+      setShowSetModal(false);
+      setSetForm({ setName: "", graduationYear: new Date().getFullYear(), description: "" });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to create graduating set");
+    }
+  };
+
+  const handleDeleteSet = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this graduating set?")) return;
+    try {
+      await apiFetch(`/api/admin/sets/${id}`, { method: "DELETE" });
+      alert("Graduating set deleted.");
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to delete graduating set");
+    }
+  };
+
   const handleAddRosterEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -547,6 +580,11 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                     <span className="text-lg block mb-1">🎓</span>
                     <strong>Add Official Matric</strong>
                     <p className="text-[10px] text-[var(--muted-foreground)]">Add to Official Alumni Directory</p>
+                  </button>
+                  <button onClick={() => setShowSetModal(true)} className="p-3 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] text-left">
+                    <span className="text-lg block mb-1">🏛️</span>
+                    <strong>Manage Sets ({sets.length})</strong>
+                    <p className="text-[10px] text-[var(--muted-foreground)]">Add/Delete Graduating Sets</p>
                   </button>
                   <button onClick={() => { setEditingCampaign(null); setCampaignForm({ title: "", description: "", targetAmount: "" }); setShowCampaignModal(true); }} className="p-3 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] text-left">
                     <span className="text-lg block mb-1">❤️</span>
@@ -1455,6 +1493,64 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
             <div className="flex justify-end pt-2 border-t border-[var(--border)]">
               <button onClick={() => setSelectedMemberDetail(null)} className="px-5 py-2 bg-[var(--primary)] text-white rounded text-xs font-semibold">Close Profile</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Graduating Sets Modal */}
+      {showSetModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowSetModal(null)}>
+          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center border-b border-[var(--border)] pb-3">
+              <div>
+                <h3 className="font-bold text-lg text-[var(--secondary)]">Manage Graduating Sets</h3>
+                <p className="text-xs text-[var(--muted-foreground)]">Add new graduating set or remove existing sets.</p>
+              </div>
+              <button onClick={() => setShowSetModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">✕</button>
+            </div>
+
+            {/* Add Set Form */}
+            <form onSubmit={handleCreateSet} className="bg-[var(--muted)] p-3 rounded-lg space-y-2 text-xs">
+              <p className="font-bold text-[var(--foreground)]">+ Add New Graduating Set</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-medium mb-0.5">Set Name *</label>
+                  <input required type="text" placeholder="e.g. Omicron Set" value={setForm.setName} onChange={e => setSetForm({ ...setForm, setName: e.target.value })} className="w-full p-1.5 border rounded bg-white" />
+                </div>
+                <div>
+                  <label className="block font-medium mb-0.5">Graduation Year *</label>
+                  <input required type="number" placeholder="2027" value={setForm.graduationYear} onChange={e => setSetForm({ ...setForm, graduationYear: Number(e.target.value) })} className="w-full p-1.5 border rounded bg-white font-bold" />
+                </div>
+              </div>
+              <div>
+                <label className="block font-medium mb-0.5">Description (Optional)</label>
+                <input type="text" placeholder="e.g. Class of 2027" value={setForm.description} onChange={e => setSetForm({ ...setForm, description: e.target.value })} className="w-full p-1.5 border rounded bg-white" />
+              </div>
+              <button type="submit" className="w-full py-1.5 bg-[var(--primary)] text-white rounded font-bold hover:bg-[var(--accent)]">
+                Create Graduating Set
+              </button>
+            </form>
+
+            {/* Sets List */}
+            <div>
+              <p className="font-bold text-xs text-[var(--foreground)] mb-2">Existing Graduating Sets ({sets.length}):</p>
+              <div className="divide-y divide-[var(--border)] max-h-48 overflow-y-auto border rounded">
+                {sets.map(s => (
+                  <div key={s.id} className="p-2.5 flex items-center justify-between text-xs">
+                    <div>
+                      <p className="font-bold text-[var(--foreground)]">{s.setName} ({s.graduationYear})</p>
+                      {s.description && <p className="text-[10px] text-[var(--muted-foreground)]">{s.description}</p>}
+                    </div>
+                    <button onClick={() => handleDeleteSet(s.id)} className="px-2 py-1 bg-red-100 text-red-700 rounded text-[10px] font-bold hover:bg-red-200">
+                      Delete
+                    </button>
+                  </div>
+                ))}
+                {sets.length === 0 && <p className="p-4 text-center text-xs text-[var(--muted-foreground)]">No graduating sets found.</p>}
+              </div>
+            </div>
+
+            <button onClick={() => setShowSetModal(false)} className="w-full py-2 bg-[var(--primary)] text-white rounded text-xs font-semibold">Close</button>
           </div>
         </div>
       )}
