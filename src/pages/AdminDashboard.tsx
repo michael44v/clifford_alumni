@@ -19,6 +19,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [events, setEvents] = useState<any[]>([]);
   const [news, setNews] = useState<any[]>([]);
   const [leadership, setLeadership] = useState<any[]>([]);
+  const [jobPosts, setJobPosts] = useState<any[]>([]);
   const [duesItems, setDuesItems] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [impactStats, setImpactStats] = useState<any | null>(null);
@@ -36,6 +37,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [showEventModal, setShowEventModal] = useState(false);
   const [showNewsModal, setShowNewsModal] = useState(false);
   const [showLeadershipModal, setShowLeadershipModal] = useState(false);
+  const [editingLeader, setEditingLeader] = useState<any | null>(null);
   const [showAOTWModal, setShowAOTWModal] = useState<any | null>(null);
   const [showRosterModal, setShowRosterModal] = useState(false);
   const [showWelfareModal, setShowWelfareModal] = useState<any | null>(null);
@@ -58,7 +60,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [setForm, setSetForm] = useState({ setName: "", graduationYear: new Date().getFullYear(), description: "" });
   const [eventForm, setEventForm] = useState({ title: "", description: "", date: "", time: "", venue: "", category: "General", organizer: "CUAA" });
   const [newsForm, setNewsForm] = useState({ title: "", content: "", category: "OFFICIAL_ANNOUNCEMENT" });
-  const [leadershipForm, setLeadershipForm] = useState({ name: "", position: "", biography: "", termStart: new Date().getFullYear() });
+  const [leadershipForm, setLeadershipForm] = useState({ name: "", position: "", biography: "", termStart: new Date().getFullYear(), photoUrl: "" });
   const [aotwBio, setAotwBio] = useState("");
   const [rosterForm, setRosterForm] = useState({ matricNumber: "", firstName: "", lastName: "", facultyId: "", graduatingSetId: "", department: "" });
   const [duesForm, setDuesForm] = useState({ title: "", amount: "", type: "ANNUAL_DUES", academicYear: "2024/2025", description: "" });
@@ -67,7 +69,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [statsRes, membersRes, rosterRes, mediaRes, welfareRes, paymentsRes, facultiesRes, setsRes, eventsRes, newsRes, leadershipRes, duesRes, campaignsRes, impactRes] = await Promise.all([
+      const [statsRes, membersRes, rosterRes, mediaRes, welfareRes, paymentsRes, facultiesRes, setsRes, eventsRes, newsRes, leadershipRes, duesRes, campaignsRes, impactRes, jobsRes] = await Promise.all([
         apiFetch("/api/admin/stats").catch(() => null),
         apiFetch(`/api/admin/members?search=${encodeURIComponent(memberSearch)}&status=${memberFilterStatus}`).catch(() => []),
         apiFetch(`/api/admin/official-directory?search=${encodeURIComponent(rosterSearch)}`).catch(() => []),
@@ -82,6 +84,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         apiFetch("/api/finance/dues").catch(() => []),
         apiFetch("/api/finance/campaigns?all=true").catch(() => []),
         apiFetch("/api/finance/impact-stats").catch(() => null),
+        apiFetch("/api/community/posts?limit=50").catch(() => []),
       ]);
 
       if (statsRes) setAdminStats(statsRes);
@@ -95,6 +98,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setEvents(Array.isArray(eventsRes) ? eventsRes : eventsRes?.data || []);
       setNews(Array.isArray(newsRes) ? newsRes : newsRes?.data || []);
       setLeadership(Array.isArray(leadershipRes) ? leadershipRes : []);
+      setJobPosts(Array.isArray(jobsRes) ? jobsRes : jobsRes?.data || []);
       setDuesItems(Array.isArray(duesRes) ? duesRes : duesRes?.data || []);
       setCampaigns(Array.isArray(campaignsRes) ? campaignsRes : []);
       if (impactRes) {
@@ -320,19 +324,41 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const handleCreateLeadership = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await apiFetch("/api/admin/leadership", {
-        method: "POST",
-        body: JSON.stringify({
-          ...leadershipForm,
-          termStart: Number(leadershipForm.termStart),
-        }),
-      });
-      alert("EXCO leadership profile added!");
+      if (editingLeader) {
+        await apiFetch(`/api/admin/leadership/${editingLeader.id}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            ...leadershipForm,
+            termStart: Number(leadershipForm.termStart),
+          }),
+        });
+        alert("EXCO leadership profile updated!");
+      } else {
+        await apiFetch("/api/admin/leadership", {
+          method: "POST",
+          body: JSON.stringify({
+            ...leadershipForm,
+            termStart: Number(leadershipForm.termStart),
+          }),
+        });
+        alert("EXCO leadership profile added!");
+      }
       setShowLeadershipModal(false);
-      setLeadershipForm({ name: "", position: "", biography: "", termStart: new Date().getFullYear() });
+      setEditingLeader(null);
+      setLeadershipForm({ name: "", position: "", biography: "", termStart: new Date().getFullYear(), photoUrl: "" });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to create leadership profile");
+      alert(err.message || "Failed to save leadership profile");
+    }
+  };
+
+  const handleDeleteJobPost = async (id: string) => {
+    if (!confirm("Delete this opportunity post?")) return;
+    try {
+      await apiFetch(`/api/community/posts/${id}`, { method: "DELETE" });
+      fetchData();
+    } catch (err: any) {
+      alert(err.message || "Failed to delete post");
     }
   };
 
@@ -1103,6 +1129,28 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
               </div>
             </div>
 
+            {/* List of Job & Opportunity Postings */}
+            <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
+              <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
+                <h3 className="font-bold text-sm text-[var(--foreground)]">Job & Opportunity Postings ({jobPosts.length})</h3>
+                <button onClick={() => onNavigate("career")} className="px-3 py-1 bg-[var(--primary)] text-white rounded text-xs font-semibold">View Job Board ↗</button>
+              </div>
+              <div className="divide-y divide-[var(--border)]">
+                {jobPosts.map((j) => (
+                  <div key={j.id} className="p-4 flex items-center justify-between gap-4 text-xs">
+                    <div>
+                      <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded mb-1 inline-block">{j.category || "Career"}</span>
+                      <p className="font-semibold text-sm text-[var(--foreground)]">{j.title}</p>
+                      <p className="text-[var(--muted-foreground)] line-clamp-2 mt-0.5">{j.content}</p>
+                      <p className="text-[10px] text-[var(--muted-foreground)] mt-1">Posted by: {j.author ? `${j.author.firstName} ${j.author.lastName}` : "Member"} on {new Date(j.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    <button onClick={() => handleDeleteJobPost(j.id)} className="px-3 py-1 bg-red-100 text-red-700 rounded font-semibold hover:bg-red-200">Delete</button>
+                  </div>
+                ))}
+                {jobPosts.length === 0 && <p className="p-5 text-center text-xs text-[var(--muted-foreground)]">No job or opportunity postings found.</p>}
+              </div>
+            </div>
+
             {/* List of News & Announcements */}
             <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
               <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
@@ -1128,17 +1176,42 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
             <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
               <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
                 <h3 className="font-bold text-sm text-[var(--foreground)]">EXCO Leadership Governing Body ({leadership.length})</h3>
-                <button onClick={() => setShowLeadershipModal(true)} className="px-3 py-1 bg-[var(--primary)] text-white rounded text-xs font-semibold">+ Add Leader</button>
+                <button onClick={() => { setEditingLeader(null); setLeadershipForm({ name: "", position: "", biography: "", termStart: new Date().getFullYear(), photoUrl: "" }); setShowLeadershipModal(true); }} className="px-3 py-1 bg-[var(--primary)] text-white rounded text-xs font-semibold">+ Add Leader</button>
               </div>
               <div className="divide-y divide-[var(--border)]">
                 {leadership.map((l) => (
                   <div key={l.id} className="p-4 flex items-center justify-between gap-4 text-xs">
-                    <div>
-                      <p className="font-semibold text-sm text-[var(--foreground)]">{l.name}</p>
-                      <p className="text-[var(--primary)] font-medium">{l.position} · Term Start: {l.termStart}</p>
-                      <p className="text-[var(--muted-foreground)] mt-0.5 line-clamp-1">{l.biography}</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-lg overflow-hidden border border-[var(--border)] bg-[var(--muted)] flex-shrink-0">
+                        <img src={l.photo?.secureUrl || "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200&h=200&fit=crop&auto=format"} alt={l.name} className="w-full h-full object-cover" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm text-[var(--foreground)]">{l.name}</p>
+                        <p className="text-[var(--primary)] font-medium">{l.position} · Term Start: {l.termStart}</p>
+                        <p className="text-[var(--muted-foreground)] mt-0.5 line-clamp-1">{l.biography}</p>
+                      </div>
                     </div>
-                    <button onClick={() => handleDeleteLeadership(l.id)} className="px-3 py-1 bg-red-100 text-red-700 rounded font-semibold hover:bg-red-200">Delete</button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingLeader(l);
+                          setLeadershipForm({
+                            name: l.name,
+                            position: l.position,
+                            biography: l.biography,
+                            termStart: l.termStart,
+                            photoUrl: l.photo?.secureUrl || "",
+                          });
+                          setShowLeadershipModal(true);
+                        }}
+                        className="px-3 py-1 border border-[var(--border)] rounded font-semibold hover:border-[var(--primary)]"
+                      >
+                        Edit
+                      </button>
+                      <button onClick={() => handleDeleteLeadership(l.id)} className="px-3 py-1 bg-red-100 text-red-700 rounded font-semibold hover:bg-red-200">
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {leadership.length === 0 && <p className="p-5 text-center text-xs text-[var(--muted-foreground)]">No leadership profiles created yet.</p>}
@@ -1849,7 +1922,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       {showLeadershipModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <h3 className="font-bold text-lg mb-4">Add EXCO Leader Profile</h3>
+            <h3 className="font-bold text-lg mb-4">{editingLeader ? "Edit EXCO Leader Profile" : "Add EXCO Leader Profile"}</h3>
             <form onSubmit={handleCreateLeadership} className="space-y-3 text-xs">
               <div>
                 <label className="block font-medium mb-1">Full Name *</label>
@@ -1859,6 +1932,47 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                 <label className="block font-medium mb-1">Position / Office *</label>
                 <input required type="text" placeholder="e.g. President, General Secretary" value={leadershipForm.position} onChange={e => setLeadershipForm({...leadershipForm, position: e.target.value})} className="w-full p-2 border rounded" />
               </div>
+
+              {/* Photo Upload & Preview */}
+              <div className="p-3 bg-[var(--muted)] border rounded space-y-2">
+                <label className="block font-semibold">EXCO Leader Photo</label>
+                <div className="grid grid-cols-1 gap-2">
+                  <div>
+                    <label className="block text-[10px] text-[var(--muted-foreground)] mb-0.5">Upload Image File</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setLeadershipForm({ ...leadershipForm, photoUrl: reader.result as string });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="w-full text-[11px] bg-white border p-1 rounded"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-[var(--muted-foreground)] mb-0.5">Or Direct Photo URL</label>
+                    <input
+                      type="text"
+                      placeholder="https://..."
+                      value={leadershipForm.photoUrl.startsWith("data:") ? "[Local File Uploaded]" : leadershipForm.photoUrl}
+                      onChange={e => setLeadershipForm({ ...leadershipForm, photoUrl: e.target.value })}
+                      className="w-full p-2 border rounded bg-white"
+                    />
+                  </div>
+                </div>
+                {leadershipForm.photoUrl && (
+                  <div className="w-16 h-16 rounded overflow-hidden border border-[var(--border)]">
+                    <img src={leadershipForm.photoUrl} alt="Leader Preview" className="w-full h-full object-cover" />
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="block font-medium mb-1">Biography *</label>
                 <textarea required rows={3} value={leadershipForm.biography} onChange={e => setLeadershipForm({...leadershipForm, biography: e.target.value})} className="w-full p-2 border rounded" />
@@ -1869,7 +1983,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
               </div>
               <div className="flex gap-2 justify-end pt-2">
                 <button type="button" onClick={() => setShowLeadershipModal(false)} className="px-4 py-2 border rounded font-medium">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-[var(--primary)] text-white rounded font-semibold">Save Profile</button>
+                <button type="submit" className="px-4 py-2 bg-[var(--primary)] text-white rounded font-semibold">{editingLeader ? "Update Profile" : "Save Profile"}</button>
               </div>
             </form>
           </div>
