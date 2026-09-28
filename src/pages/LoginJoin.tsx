@@ -1,6 +1,7 @@
 import { useState } from "react";
 import cuaaLogo from "@/imports/CUAA.jpg";
 import { apiFetch, setAccessToken } from "../lib/api";
+import { showToast } from "../components/Toast";
 
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 
@@ -105,7 +106,7 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
       const isAdmin = res.member?.role === "ADMIN" || res.member?.role === "SUPER_ADMIN" || loginEmail === "admin@cuaa.ng";
       onLogin(isAdmin);
     } catch (err: any) {
-      alert(err.message || "Invalid credentials");
+      showToast(err.message || "Invalid credentials", "error");
     }
   };
 
@@ -178,10 +179,10 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
       if (res.accessToken) {
         setAccessToken(res.accessToken);
       }
-      alert("Registration successful!");
+      showToast("Registration successful!", "success");
       onLogin(false);
     } catch (err: any) {
-      alert(err.message || "Registration failed");
+      showToast(err.message || "Registration failed", "error");
     }
   };
 

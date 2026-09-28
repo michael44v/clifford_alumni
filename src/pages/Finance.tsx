@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "../lib/api";
+import { showToast } from "../components/Toast";
+import { TableRowSkeleton, CardSkeleton } from "../components/Skeleton";
 
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface FinanceProps { onNavigate: (page: Page) => void; isLoggedIn: boolean; }
@@ -46,7 +48,7 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
           method: "POST",
           body: JSON.stringify({ duesItemId: payingItem.id }),
         });
-        alert("Payment successful via Korapay! Reference: " + (response?.reference || response?.checkout_reference || "SUCCESS"));
+        showToast("Payment successful via Korapay! Reference: " + (response?.reference || response?.checkout_reference || "SUCCESS"), "success");
         setPayingItem(null);
         await refreshData();
       };
@@ -69,10 +71,10 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
             recordPayment(response);
           },
           onClose: function () {
-            alert("Korapay payment window closed.");
+            showToast("Korapay payment window closed.", "info");
           },
           onFailed: function (response: any) {
-            alert("Payment failed: " + (response?.message || "Transaction uncompleted"));
+            showToast("Payment failed: " + (response?.message || "Transaction uncompleted"), "error");
           },
         });
       } else {
@@ -80,7 +82,7 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
         await recordPayment();
       }
     } catch (err: any) {
-      alert(err.message || "Payment failed");
+      showToast(err.message || "Payment failed", "error");
     }
   };
 
@@ -153,7 +155,10 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
               <p><strong className="text-[var(--foreground)]">Annual Dues Policy:</strong> All verified CLUAA members are required to pay annual dues to maintain Active Member status.</p>
             </div>
             {loading ? (
-              <div className="text-center py-8 text-[var(--muted-foreground)]">Loading dues...</div>
+              <div className="space-y-3">
+                <CardSkeleton />
+                <CardSkeleton />
+              </div>
             ) : duesList.length === 0 ? (
               <div className="text-center py-12 text-[var(--muted-foreground)] bg-white rounded-xl border border-[var(--border)]">
                 <p className="font-semibold text-base mb-1">No outstanding dues or levies schedule found</p>
@@ -199,7 +204,10 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
               <h3 className="font-semibold text-[var(--foreground)]">All Transactions</h3>
             </div>
             {loading ? (
-              <div className="text-center py-8 text-[var(--muted-foreground)]">Loading history...</div>
+              <div className="p-4 space-y-2">
+                <TableRowSkeleton cols={6} />
+                <TableRowSkeleton cols={6} />
+              </div>
             ) : paymentHistory.length === 0 ? (
               <div className="text-center py-12 text-[var(--muted-foreground)]">
                 <p className="font-semibold">No transactions recorded yet</p>

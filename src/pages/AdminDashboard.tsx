@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "../lib/api";
+import { showToast } from "../components/Toast";
 
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface AdminDashboardProps { onNavigate: (page: Page) => void; onLogout: () => void; }
@@ -139,7 +140,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       }
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to update member status");
+      showToast(err.message || "Failed to update member status", "error");
     }
   };
 
@@ -148,7 +149,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       const data = await apiFetch(`/api/admin/members/${id}/details`);
       setSelectedMemberDetail(data);
     } catch (err: any) {
-      alert(err.message || "Failed to fetch member details");
+      showToast(err.message || "Failed to fetch member details", "error");
     }
   };
 
@@ -160,7 +161,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to update photo showcase status");
+      showToast(err.message || "Failed to update photo showcase status", "error");
     }
   };
 
@@ -170,7 +171,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       await apiFetch(`/api/admin/gallery/photos/${id}`, { method: "DELETE" });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to delete photo");
+      showToast(err.message || "Failed to delete photo", "error");
     }
   };
 
@@ -209,7 +210,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setAdminCaptions([""]);
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to upload photos");
+      showToast(err.message || "Failed to upload photos", "error");
     } finally {
       setIsAdminSubmitting(false);
     }
@@ -230,7 +231,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setShowAOTWModal(null);
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to set Alumni of the Week");
+      showToast(err.message || "Failed to set Alumni of the Week", "error");
     }
   };
 
@@ -242,7 +243,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to unset Alumni of the Week");
+      showToast(err.message || "Failed to unset Alumni of the Week", "error");
     }
   };
 
@@ -257,7 +258,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       }
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to update welfare case status");
+      showToast(err.message || "Failed to update welfare case status", "error");
     }
   };
 
@@ -281,7 +282,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setEventForm({ title: "", description: "", date: "", time: "", venue: "", category: "General", organizer: "CUAA" });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to create event");
+      showToast(err.message || "Failed to create event", "error");
     }
   };
 
@@ -291,7 +292,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       await apiFetch(`/api/events/${id}`, { method: "DELETE" });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to delete event");
+      showToast(err.message || "Failed to delete event", "error");
     }
   };
 
@@ -307,7 +308,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setNewsForm({ title: "", content: "", category: "OFFICIAL_ANNOUNCEMENT" });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to post announcement");
+      showToast(err.message || "Failed to post announcement", "error");
     }
   };
 
@@ -317,7 +318,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       await apiFetch(`/api/news/${id}`, { method: "DELETE" });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to delete announcement");
+      showToast(err.message || "Failed to delete announcement", "error");
     }
   };
 
@@ -348,7 +349,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setLeadershipForm({ name: "", position: "", biography: "", termStart: new Date().getFullYear(), photoUrl: "" });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to save leadership profile");
+      showToast(err.message || "Failed to save leadership profile", "error");
     }
   };
 
@@ -358,7 +359,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       await apiFetch(`/api/community/posts/${id}`, { method: "DELETE" });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to delete post");
+      showToast(err.message || "Failed to delete post", "error");
     }
   };
 
@@ -368,7 +369,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       await apiFetch(`/api/admin/leadership/${id}`, { method: "DELETE" });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to delete leadership profile");
+      showToast(err.message || "Failed to delete leadership profile", "error");
     }
   };
 
@@ -388,7 +389,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setSetForm({ setName: "", graduationYear: new Date().getFullYear(), description: "" });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to create graduating set");
+      showToast(err.message || "Failed to create graduating set", "error");
     }
   };
 
@@ -399,7 +400,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       alert("Graduating set deleted.");
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to delete graduating set");
+      showToast(err.message || "Failed to delete graduating set", "error");
     }
   };
 
@@ -415,7 +416,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setRosterForm({ matricNumber: "", firstName: "", lastName: "", facultyId: "", graduatingSetId: "", department: "" });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to add roster entry");
+      showToast(err.message || "Failed to add roster entry", "error");
     }
   };
 
@@ -425,7 +426,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       await apiFetch(`/api/admin/official-directory/${id}`, { method: "DELETE" });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to delete entry");
+      showToast(err.message || "Failed to delete entry", "error");
     }
   };
 
@@ -447,7 +448,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setDuesForm({ title: "", amount: "", type: "ANNUAL_DUES", academicYear: "2024/2025", description: "" });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to create dues item");
+      showToast(err.message || "Failed to create dues item", "error");
     }
   };
 
@@ -457,7 +458,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       await apiFetch(`/api/finance/dues/${id}`, { method: "DELETE" });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to delete dues item");
+      showToast(err.message || "Failed to delete dues item", "error");
     }
   };
 
@@ -490,7 +491,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setCampaignForm({ title: "", description: "", targetAmount: "" });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to save donation cause");
+      showToast(err.message || "Failed to save donation cause", "error");
     }
   };
 
@@ -500,7 +501,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       await apiFetch(`/api/finance/campaigns/${id}`, { method: "DELETE" });
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to delete donation cause");
+      showToast(err.message || "Failed to delete donation cause", "error");
     }
   };
 
@@ -514,7 +515,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       alert("Impact statistics updated!");
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to update impact statistics");
+      showToast(err.message || "Failed to update impact statistics", "error");
     }
   };
 

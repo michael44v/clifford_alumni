@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "../lib/api";
+import { showToast } from "../components/Toast";
+import { GridSkeleton } from "../components/Skeleton";
 
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface GalleryProps { onNavigate: (page: Page) => void; }
@@ -75,7 +77,7 @@ export default function Gallery({ onNavigate }: GalleryProps) {
       .filter(p => p.url.length > 0);
 
     if (validPhotos.length === 0) {
-      alert("Please enter at least one photo URL or upload an image file.");
+      showToast("Please enter at least one photo URL or upload an image file.", "error");
       return;
     }
 
@@ -91,14 +93,14 @@ export default function Gallery({ onNavigate }: GalleryProps) {
         }),
       });
 
-      alert(`Successfully uploaded ${validPhotos.length} photo(s) to gallery showcase!`);
+      showToast(`Successfully uploaded ${validPhotos.length} photo(s) to gallery showcase!`, "success");
       setShowUploadModal(false);
       setUploadAlbumTitle("");
       setImageUrls([""]);
       setCaptions([""]);
       fetchAlbums();
     } catch (err: any) {
-      alert(err.message || "Failed to upload photos");
+      showToast(err.message || "Failed to upload photos", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -142,7 +144,7 @@ export default function Gallery({ onNavigate }: GalleryProps) {
 
         {/* Album Grid */}
         {loading ? (
-          <div className="text-center py-12 text-[var(--muted-foreground)]">Loading photo gallery...</div>
+          <GridSkeleton count={8} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {filtered.map((album) => {
