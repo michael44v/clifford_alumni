@@ -124,6 +124,18 @@ router.post("/sets", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN"), valid
   }
 });
 
+// DELETE /api/admin/sets/:id (Delete Graduating Set)
+router.delete("/sets/:id", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    await prisma.graduatingSet.delete({ where: { id } });
+    return res.json({ message: "Graduating set deleted successfully" });
+  } catch (err) {
+    console.error("Delete graduating set error:", err);
+    return res.status(500).json({ error: "Failed to delete graduating set" });
+  }
+});
+
 // GET /api/admin/leadership (Public EXCO Profiles)
 router.get("/leadership", async (req, res) => {
   try {

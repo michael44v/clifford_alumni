@@ -1,10 +1,12 @@
 // Centralized API client for communicating with backend Express API at /api
 
 let accessToken: string | null = localStorage.getItem("cuaa_access_token");
+let isSessionExpiredNotified = false;
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
   if (token) {
+    isSessionExpiredNotified = false;
     localStorage.setItem("cuaa_access_token", token);
   } else {
     localStorage.removeItem("cuaa_access_token");
@@ -62,8 +64,11 @@ export async function apiFetch<T = any>(endpoint: string, options: RequestInit =
       return retryResponse.json();
     } else {
       setAccessToken(null);
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("cuaa:session-expired"));
+      if (!isSessionExpiredNotified) {
+        isSessionExpiredNotified = true;
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("cuaa:session-expired"));
+        }
       }
       throw new Error("Session expired. Please log in again.");
     }
