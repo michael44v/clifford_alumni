@@ -7,7 +7,7 @@ import { getKorapayInstance } from "../lib/korapay";
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface FinanceProps { onNavigate: (page: Page) => void; isLoggedIn: boolean; }
 
-type FinanceTab = "dues" | "history";
+type FinanceTab = "dues" | "levies" | "history" | "receipts";
 
 export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
   const [activeTab, setActiveTab] = useState<FinanceTab>("dues");
@@ -152,23 +152,40 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
         </div>
 
         {/* Annual Dues & Levies */}
-        {activeTab === "dues" && (
+        {(activeTab === "dues" || activeTab === "levies") && (
           <div className="space-y-4">
             <div className="bg-[var(--muted)] rounded-xl p-4 text-sm text-[var(--muted-foreground)]">
-              <p><strong className="text-[var(--foreground)]">Annual Dues Policy:</strong> All verified CLUAA members are required to pay annual dues to maintain Active Member status.</p>
+              <p>
+                <strong className="text-[var(--foreground)]">
+                  {activeTab === "dues" ? "Annual Dues Policy:" : "Association Levies:"}
+                </strong>{" "}
+                {activeTab === "dues"
+                  ? "All verified CLUAA members are required to pay annual dues to maintain Active Member status."
+                  : "Special and project levies raised for specific alumni association initiatives."}
+              </p>
             </div>
             {loading ? (
               <div className="space-y-3">
                 <CardSkeleton />
                 <CardSkeleton />
               </div>
-            ) : duesList.length === 0 ? (
-              <div className="text-center py-12 text-[var(--muted-foreground)] bg-white rounded-xl border border-[var(--border)]">
-                <p className="font-semibold text-base mb-1">No outstanding dues or levies schedule found</p>
-                <p className="text-xs">Your account is fully up to date.</p>
-              </div>
-            ) : (
-              duesList.map((d) => {
+            ) : (() => {
+              const items = duesList.filter(d => {
+                if (activeTab === "dues") return d.type === "ANNUAL_DUES" || !d.type;
+                if (activeTab === "levies") return d.type === "SPECIAL_LEVY" || d.type === "PROJECT_LEVY" || d.type?.includes("LEVY");
+                return true;
+              });
+
+              if (items.length === 0) {
+                return (
+                  <div className="text-center py-12 text-[var(--muted-foreground)] bg-white rounded-xl border border-[var(--border)]">
+                    <p className="font-semibold text-base mb-1">No {activeTab === "dues" ? "annual dues" : "special levies"} schedule found</p>
+                    <p className="text-xs">Your account is up to date.</p>
+                  </div>
+                );
+              }
+
+              return items.map((d) => {
                 const isPaid = d.status === "PAID";
                 return (
                   <div key={d.id || d.title} className="bg-white border border-[var(--border)] rounded-xl p-5 flex flex-col sm:flex-row sm:items-center gap-4">
@@ -190,13 +207,69 @@ export default function Finance({ onNavigate, isLoggedIn }: FinanceProps) {
                     </div>
                   </div>
                 );
-              })
-            )}
+              });
+            })()}
             <div className="text-center pt-4">
               <button onClick={() => onNavigate("donate")} className="px-6 py-3 border border-[var(--primary)] text-[var(--primary)] rounded-lg text-sm font-semibold hover:bg-[var(--primary)] hover:text-white transition-colors">
                 Also Make a Donation →
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Receipts Tab */}
+        {activeTab === "receipts" && (
+          <div className="bg-white border border-[var(--border)] rounded-xl overflow-hidden p-5">
+            <h3 className="font-semibold text-[var(--foreground)] mb-4">Official Payment Receipts</h3>
+            {paymentHistory.filter(p => p.status === "SUCCESSFUL" || p.status === "PAID").length === 0 ? (
+              <p className="text-center py-8 text-xs text-[var(--muted-foreground)]">No official payment receipts available yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {paymentHistory
+                  .filter(p => p.status === "SUCCESSFUL" || p.status === "PAID")
+                  .map(p => (
+                    <div key={p.id} className="border border-[var(--border)] rounded-lg p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-[var(--muted)]/30">
+                      <div>
+                        <p className="font-bold text-sm text-[var(--foreground)]">{p.duesItem?.title || p.donationCampaign?.title || "Alumni Association Payment"}</p>
+                        <p className="text-xs text-[var(--muted-foreground)]">Receipt Ref: <span className="font-mono text-[var(--foreground)]">{p.receiptNumber || p.id}</span> • Date: {new Date(p.createdAt).toLocaleDateString()}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <p className="font-bold text-base text-green-700">₦{Number(p.amount).toLocaleString()}</p>
+                        <button
+                          onClick={() => {
+                            const win = window.open("", "_blank");
+                            if (win) {
+                              win.document.write(`
+                                <html>
+                                  <head><title>Receipt - ${p.receiptNumber || p.id}</title></head>
+                                  <body style="font-family: sans-serif; padding: 40px; max-width: 600px; margin: auto; border: 1px solid #ccc; border-radius: 8px;">
+                                    <h2 style="color: #1e3a8a;">Clifford University Alumni Association</h2>
+                                    <h3>OFFICIAL PAYMENT RECEIPT</h3>
+                                    <hr />
+                                    <p><strong>Receipt Number:</strong> ${p.receiptNumber || p.id}</p>
+                                    <p><strong>Transaction Ref:</strong> ${p.transactionRef || p.id}</p>
+                                    <p><strong>Description:</strong> ${p.duesItem?.title || p.donationCampaign?.title || "Dues / Levy Payment"}</p>
+                                    <p><strong>Amount Paid:</strong> ₦${Number(p.amount).toLocaleString()}</p>
+                                    <p><strong>Payment Method:</strong> ${p.paymentMethod || "KORAPAY"}</p>
+                                    <p><strong>Date:</strong> ${new Date(p.createdAt).toLocaleString()}</p>
+                                    <p><strong>Status:</strong> ${p.status}</p>
+                                    <hr />
+                                    <p style="font-size: 12px; color: #666;">Thank you for your financial contribution to CLUAA.</p>
+                                    <button onclick="window.print()" style="padding: 8px 16px; background: #1e3a8a; color: white; border: none; border-radius: 4px; cursor: pointer;">Print Receipt</button>
+                                  </body>
+                                </html>
+                              `);
+                            }
+                          }}
+                          className="px-3 py-1.5 bg-[var(--primary)] text-white text-xs font-semibold rounded hover:bg-[var(--accent)] transition-colors"
+                        >
+                          View / Print Receipt
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
           </div>
         )}
 
