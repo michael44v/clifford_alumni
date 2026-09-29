@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import cuaaLogo from "@/imports/CUAA.jpg";
 import { apiFetch, setAccessToken } from "../lib/api";
 import { showToast } from "../components/Toast";
@@ -72,6 +72,17 @@ type MemberType = "alumni" | "associate" | null;
 
 export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps) {
   const [tab, setTab] = useState<"login" | "register">(mode);
+
+  // Dynamic lists from backend
+  const [managedDepartments, setManagedDepartments] = useState<any[]>([]);
+
+  useEffect(() => {
+    apiFetch("/api/admin/departments")
+      .then(res => {
+        if (Array.isArray(res)) setManagedDepartments(res);
+      })
+      .catch(() => {});
+  }, []);
 
   // Login
   const [loginEmail, setLoginEmail] = useState("");
@@ -403,12 +414,16 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
                             </select>
                           </div>
                         </div>
-                        {regForm.faculty && (CLU_FACULTIES_PROGRAMS[regForm.faculty] ?? []).length > 0 && (
+                        {regForm.faculty && (
                           <div>
                             <label className="block text-xs font-medium text-[var(--foreground)] mb-1">Programme / Department *</label>
                             <select required value={regForm.dept} onChange={e => setRegForm({...regForm, dept: e.target.value})} className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
                               <option value="">Select programme</option>
-                              {(CLU_FACULTIES_PROGRAMS[regForm.faculty] ?? []).map(p => <option key={p}>{p}</option>)}
+                              {managedDepartments.length > 0 ? (
+                                managedDepartments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)
+                              ) : (
+                                (CLU_FACULTIES_PROGRAMS[regForm.faculty] ?? []).map(p => <option key={p}>{p}</option>)
+                              )}
                             </select>
                           </div>
                         )}
