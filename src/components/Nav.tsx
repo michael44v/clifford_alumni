@@ -5,7 +5,7 @@ type Page =
   | "home" | "about" | "directory" | "events" | "news"
   | "career" | "business" | "welfare" | "leadership" | "gallery"
   | "finance" | "donate" | "contact" | "login" | "register"
-  | "dashboard" | "admin" | "passcode" | "passcode-purchase" | "study" | "exam";
+  | "dashboard" | "admin";
 
 interface NavProps {
   currentPage: Page;
@@ -33,9 +33,6 @@ const careerItems: DropdownItem[] = [
 ];
 
 const moreItems: DropdownItem[] = [
-  { label: "Study Mode", page: "study", icon: "📖" },
-  { label: "Exam Terminal", page: "passcode", icon: "🎓" },
-  { label: "Buy Passcode", page: "passcode-purchase", icon: "🔑" },
   { label: "Welfare Center", page: "welfare", icon: "❤️" },
   { label: "Gallery", page: "gallery", icon: "📸" },
   { label: "Contact Us", page: "contact", icon: "✉️" },

@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "../lib/api";
 import { showToast } from "../components/Toast";
-import QuestionUpload from "../components/QuestionUpload";
 
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface AdminDashboardProps { onNavigate: (page: Page) => void; onLogout: () => void; }
 
-type AdminTab = "overview" | "questions" | "roster" | "members" | "media" | "welfare" | "payments" | "donations" | "content" | "settings";
+type AdminTab = "overview" | "roster" | "members" | "media" | "welfare" | "payments" | "donations" | "content" | "settings";
 
 export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
@@ -17,6 +16,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [welfareCases, setWelfareCases] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [faculties, setFaculties] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
   const [sets, setSets] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [news, setNews] = useState<any[]>([]);
@@ -36,6 +36,8 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
 
   // Modals state
   const [showFacultyModal, setShowFacultyModal] = useState(false);
+  const [showDepartmentModal, setShowDepartmentModal] = useState(false);
+  const [editingDepartment, setEditingDepartment] = useState<any | null>(null);
   const [showSetModal, setShowSetModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
   const [showNewsModal, setShowNewsModal] = useState(false);
@@ -61,6 +63,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
 
   // Forms
   const [facultyForm, setFacultyForm] = useState({ name: "", code: "" });
+  const [departmentForm, setDepartmentForm] = useState({ name: "", code: "" });
   const [setForm, setSetForm] = useState({ setName: "", graduationYear: new Date().getFullYear(), description: "" });
   const [eventForm, setEventForm] = useState({ title: "", description: "", date: "", time: "", venue: "", category: "General", organizer: "CUAA" });
   const [newsForm, setNewsForm] = useState({ title: "", content: "", category: "OFFICIAL_ANNOUNCEMENT" });
@@ -73,7 +76,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [statsRes, membersRes, rosterRes, mediaRes, welfareRes, paymentsRes, facultiesRes, setsRes, eventsRes, newsRes, leadershipRes, duesRes, campaignsRes, impactRes, jobsRes] = await Promise.all([
+      const [statsRes, membersRes, rosterRes, mediaRes, welfareRes, paymentsRes, facultiesRes, departmentsRes, setsRes, eventsRes, newsRes, leadershipRes, duesRes, campaignsRes, impactRes, jobsRes] = await Promise.all([
         apiFetch("/api/admin/stats").catch(() => null),
         apiFetch(`/api/admin/members?search=${encodeURIComponent(memberSearch)}&status=${memberFilterStatus}`).catch(() => []),
         apiFetch(`/api/admin/official-directory?search=${encodeURIComponent(rosterSearch)}`).catch(() => []),
@@ -81,6 +84,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         apiFetch("/api/welfare/admin/cases").catch(() => []),
         apiFetch("/api/admin/payments").catch(() => []),
         apiFetch("/api/admin/faculties").catch(() => []),
+        apiFetch("/api/admin/departments").catch(() => []),
         apiFetch("/api/admin/sets").catch(() => []),
         apiFetch("/api/events?limit=50").catch(() => []),
         apiFetch("/api/news?limit=50").catch(() => []),
@@ -98,6 +102,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setWelfareCases(Array.isArray(welfareRes) ? welfareRes : []);
       setPayments(Array.isArray(paymentsRes) ? paymentsRes : []);
       setFaculties(Array.isArray(facultiesRes) ? facultiesRes : []);
+      setDepartments(Array.isArray(departmentsRes) ? departmentsRes : []);
       setSets(Array.isArray(setsRes) ? setsRes : []);
       setEvents(Array.isArray(eventsRes) ? eventsRes : eventsRes?.data || []);
       setNews(Array.isArray(newsRes) ? newsRes : newsRes?.data || []);
@@ -352,6 +357,42 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     }
   };
 
+  const handleSaveDepartment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingDepartment) {
+        await apiFetch(`/api/admin/departments/${editingDepartment.id}`, {
+          method: "PUT",
+          body: JSON.stringify(departmentForm),
+        });
+        showToast("Department updated successfully!", "success");
+      } else {
+        await apiFetch("/api/admin/departments", {
+          method: "POST",
+          body: JSON.stringify(departmentForm),
+        });
+        showToast("Department created successfully!", "success");
+      }
+      setShowDepartmentModal(false);
+      setEditingDepartment(null);
+      setDepartmentForm({ name: "", code: "" });
+      fetchData();
+    } catch (err: any) {
+      showToast(err.message || "Failed to save department", "error");
+    }
+  };
+
+  const handleDeleteDepartment = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this department?")) return;
+    try {
+      await apiFetch(`/api/admin/departments/${id}`, { method: "DELETE" });
+      showToast("Department deleted successfully.", "success");
+      fetchData();
+    } catch (err: any) {
+      showToast(err.message || "Failed to delete department", "error");
+    }
+  };
+
   const handleCreateLeadership = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -580,17 +621,12 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {/* Navigation Tabs */}
         <div className="flex overflow-x-auto gap-1 bg-white border border-[var(--border)] p-1 rounded mb-6">
-          {(["overview", "questions", "roster", "members", "media", "welfare", "payments", "donations", "content", "settings"] as AdminTab[]).map(tab => (
+          {(["overview", "roster", "members", "media", "welfare", "payments", "donations", "content", "settings"] as AdminTab[]).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-shrink-0 px-4 py-2 rounded text-xs font-medium capitalize whitespace-nowrap transition-colors ${activeTab === tab ? "bg-[var(--secondary)] text-white" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}>
-              {tab === "questions" ? "Question Upload (KaTeX)" : tab === "roster" ? "Official Roster" : tab === "media" ? "Media Gallery" : tab} {tab === "members" && pendingMembers.length > 0 ? `(${pendingMembers.length})` : ""}
+              {tab === "roster" ? "Official Roster" : tab === "media" ? "Media Gallery" : tab} {tab === "members" && pendingMembers.length > 0 ? `(${pendingMembers.length})` : ""}
             </button>
           ))}
         </div>
-
-        {/* Question Upload Tab */}
-        {activeTab === "questions" && (
-          <QuestionUpload />
-        )}
 
         {/* Overview Tab */}
         {activeTab === "overview" && (
@@ -646,7 +682,12 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                   <button onClick={() => setShowFacultyModal(true)} className="p-3 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] text-left">
                     <span className="text-lg block mb-1">🏢</span>
                     <strong>Manage Faculties ({faculties.length})</strong>
-                    <p className="text-[10px] text-[var(--muted-foreground)]">Add/Delete Faculties & Programmes</p>
+                    <p className="text-[10px] text-[var(--muted-foreground)]">Add/Delete Faculties</p>
+                  </button>
+                  <button onClick={() => { setEditingDepartment(null); setDepartmentForm({ name: "", code: "" }); setShowDepartmentModal(true); }} className="p-3 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] text-left">
+                    <span className="text-lg block mb-1">📚</span>
+                    <strong>Manage Departments ({departments.length})</strong>
+                    <p className="text-[10px] text-[var(--muted-foreground)]">Add/Edit/Delete Programmes</p>
                   </button>
                   <button onClick={() => setShowSetModal(true)} className="p-3 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] text-left">
                     <span className="text-lg block mb-1">🏛️</span>
@@ -1607,6 +1648,72 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
             <div className="flex justify-end pt-2 border-t border-[var(--border)]">
               <button onClick={() => setSelectedMemberDetail(null)} className="px-5 py-2 bg-[var(--primary)] text-white rounded text-xs font-semibold">Close Profile</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Departments Modal */}
+      {showDepartmentModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowDepartmentModal(false)}>
+          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center border-b border-[var(--border)] pb-3">
+              <div>
+                <h3 className="font-bold text-lg text-[var(--secondary)]">{editingDepartment ? "Edit Department" : "Manage Departments"}</h3>
+                <p className="text-xs text-[var(--muted-foreground)]">Create, edit, or delete academic departments (programmes).</p>
+              </div>
+              <button onClick={() => setShowDepartmentModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">✕</button>
+            </div>
+
+            {/* Add/Edit Department Form */}
+            <form onSubmit={handleSaveDepartment} className="bg-[var(--muted)] p-3 rounded-lg space-y-2 text-xs">
+              <p className="font-bold text-[var(--foreground)]">{editingDepartment ? "Edit Department" : "+ Add New Department"}</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-medium mb-0.5">Department Name *</label>
+                  <input required type="text" placeholder="e.g. Computer Science" value={departmentForm.name} onChange={e => setDepartmentForm({ ...departmentForm, name: e.target.value })} className="w-full p-1.5 border rounded bg-white" />
+                </div>
+                <div>
+                  <label className="block font-medium mb-0.5">Department Code (Optional)</label>
+                  <input type="text" placeholder="e.g. CSC" value={departmentForm.code} onChange={e => setDepartmentForm({ ...departmentForm, code: e.target.value })} className="w-full p-1.5 border rounded bg-white uppercase font-mono" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" className="flex-1 py-1.5 bg-[var(--primary)] text-white rounded font-bold hover:bg-[var(--accent)]">
+                  {editingDepartment ? "Update Department" : "Create Department"}
+                </button>
+                {editingDepartment && (
+                  <button type="button" onClick={() => { setEditingDepartment(null); setDepartmentForm({ name: "", code: "" }); }} className="px-3 py-1.5 border rounded font-bold bg-white">
+                    Cancel Edit
+                  </button>
+                )}
+              </div>
+            </form>
+
+            {/* Departments List */}
+            <div>
+              <p className="font-bold text-xs text-[var(--foreground)] mb-2">Existing Departments ({departments.length}):</p>
+              <div className="divide-y divide-[var(--border)] max-h-48 overflow-y-auto border rounded">
+                {departments.map(d => (
+                  <div key={d.id} className="p-2.5 flex items-center justify-between text-xs">
+                    <div>
+                      <p className="font-bold text-[var(--foreground)]">{d.name}</p>
+                      {d.code && <p className="text-[10px] font-mono text-[var(--primary)]">Code: {d.code}</p>}
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => { setEditingDepartment(d); setDepartmentForm({ name: d.name, code: d.code || "" }); }} className="px-2 py-1 bg-amber-100 text-amber-800 rounded text-[10px] font-bold hover:bg-amber-200">
+                        Edit
+                      </button>
+                      <button onClick={() => handleDeleteDepartment(d.id)} className="px-2 py-1 bg-red-100 text-red-700 rounded text-[10px] font-bold hover:bg-red-200">
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {departments.length === 0 && <p className="p-4 text-center text-xs text-[var(--muted-foreground)]">No departments found.</p>}
+              </div>
+            </div>
+
+            <button onClick={() => setShowDepartmentModal(false)} className="w-full py-2 bg-[var(--primary)] text-white rounded text-xs font-semibold">Close</button>
           </div>
         </div>
       )}

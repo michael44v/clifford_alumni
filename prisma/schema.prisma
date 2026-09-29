@@ -165,6 +165,14 @@ model Faculty {
   officialDirectoryEntries OfficialAlumniDirectory[]
 }
 
+model Department {
+  id        String   @id @default(uuid())
+  name      String   @unique // e.g., "Computer Science", "Accounting"
+  code      String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Location {
   id          String   @id @default(uuid())
   state       String   // e.g. "Abia", "Lagos", "FCT (Abuja)", or Country name if Diaspora

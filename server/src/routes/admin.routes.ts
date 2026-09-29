@@ -11,6 +11,11 @@ const facultySchema = z.object({
   code: z.string().optional(),
 });
 
+const departmentSchema = z.object({
+  name: z.string().min(2),
+  code: z.string().optional(),
+});
+
 const setSchema = z.object({
   setName: z.string().min(2),
   graduationYear: z.number().int(),
@@ -113,6 +118,53 @@ router.delete("/faculties/:id", authenticateJWT, requireRole("ADMIN", "SUPER_ADM
   } catch (err) {
     console.error("Delete faculty error:", err);
     return res.status(500).json({ error: "Failed to delete faculty" });
+  }
+});
+
+// GET /api/admin/departments
+router.get("/departments", async (req, res) => {
+  try {
+    const departments = await prisma.department.findMany({ orderBy: { name: "asc" } });
+    return res.json(departments);
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to fetch departments" });
+  }
+});
+
+// POST /api/admin/departments
+router.post("/departments", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN"), validateBody(departmentSchema), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const department = await prisma.department.create({ data: req.body });
+    return res.status(201).json(department);
+  } catch (err) {
+    return res.status(500).json({ error: "Failed to create department" });
+  }
+});
+
+// PUT /api/admin/departments/:id
+router.put("/departments/:id", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN"), validateBody(departmentSchema.partial()), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const department = await prisma.department.update({
+      where: { id },
+      data: req.body,
+    });
+    return res.json(department);
+  } catch (err) {
+    console.error("Update department error:", err);
+    return res.status(500).json({ error: "Failed to update department" });
+  }
+});
+
+// DELETE /api/admin/departments/:id
+router.delete("/departments/:id", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    await prisma.department.delete({ where: { id } });
+    return res.json({ message: "Department deleted successfully" });
+  } catch (err) {
+    console.error("Delete department error:", err);
+    return res.status(500).json({ error: "Failed to delete department" });
   }
 });
 
