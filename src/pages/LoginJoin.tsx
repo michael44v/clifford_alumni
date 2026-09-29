@@ -154,12 +154,17 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
       const endpoint = memberType === "alumni" ? "/api/auth/register/alumni" : "/api/auth/register/associate";
       const payload = memberType === "alumni"
         ? {
-            matricNumber: matricNumber || "CLU/DEMO/001",
+            matricNumber: matricNumber || "CLU/NEW/001",
             email: regForm.email,
             password: regForm.password,
             firstName,
             lastName,
             phone: regForm.phone,
+            department: regForm.dept,
+            profession: regForm.profession,
+            gradSet: regForm.gradSet,
+            faculty: regForm.faculty,
+            location: regForm.location,
           }
         : {
             email: regForm.email,
@@ -186,13 +191,9 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
     }
   };
 
-  const progressSteps = memberType === "alumni"
-    ? ["Member Type", "Matric Verify", "Details", "Security"]
-    : ["Member Type", "Details", "Security"];
+  const progressSteps = ["Member Type", "Details", "Security"];
 
-  const currentStepIdx = memberType === "alumni"
-    ? ["type", "matric", "details", "security"].indexOf(regStep)
-    : ["type", "details", "security"].indexOf(regStep === "matric" ? "details" : regStep);
+  const currentStepIdx = ["type", "details", "security"].indexOf(regStep === "matric" ? "details" : regStep);
 
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[var(--muted)] flex items-center justify-center px-4 py-12">
@@ -280,13 +281,13 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
                   <p className="text-sm text-[var(--muted-foreground)] mb-6">Select your membership type to continue</p>
                   <div className="space-y-3">
                     <button
-                      onClick={() => { setMemberType("alumni"); setRegStep("matric"); }}
+                      onClick={() => { setMemberType("alumni"); setRegStep("details"); }}
                       className="w-full flex items-start gap-4 p-4 border-2 border-[var(--border)] rounded-xl hover:border-[var(--primary)] hover:bg-[var(--muted)] transition-all text-left group"
                     >
                       <div className="w-10 h-10 bg-[var(--primary)] rounded-lg flex items-center justify-center text-white text-lg flex-shrink-0 mt-0.5">🎓</div>
                       <div>
                         <p className="font-semibold text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors">Alumni Member</p>
-                        <p className="text-xs text-[var(--muted-foreground)] mt-0.5 leading-relaxed">For graduates of Clifford University. Requires a valid matriculation number for verification. Full platform access upon approval.</p>
+                        <p className="text-xs text-[var(--muted-foreground)] mt-0.5 leading-relaxed">For graduates of Clifford University. Register with your matriculation number and details to join the network.</p>
                       </div>
                     </button>
                     <button
@@ -344,19 +345,29 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
                 </>
               )}
 
-              {/* Step 3: Details */}
+              {/* Step 2: Details */}
               {regStep === "details" && (
                 <>
                   <h2 className="font-display text-xl font-bold text-[var(--secondary)] mb-1">
-                    {memberType === "alumni" ? "Your Information" : "Associate Member Details"}
+                    {memberType === "alumni" ? "Alumni Registration Details" : "Associate Member Details"}
                   </h2>
-                  {matricVerified && (
-                    <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 mb-4">
-                      <span className="text-green-600 text-sm">✓</span>
-                      <p className="text-xs text-green-700">Matriculation number verified: <strong className="font-mono">{matricNumber.toUpperCase()}</strong></p>
-                    </div>
-                  )}
+                  <p className="text-xs text-[var(--muted-foreground)] mb-4">
+                    Fill in your details to create your CLUAA alumni profile.
+                  </p>
                   <form className="space-y-3 mt-2">
+                    {memberType === "alumni" && (
+                      <div>
+                        <label className="block text-xs font-medium text-[var(--foreground)] mb-1">Matriculation Number *</label>
+                        <input
+                          required
+                          type="text"
+                          value={matricNumber}
+                          onChange={e => setMatricNumber(e.target.value)}
+                          placeholder="e.g. CLU/16/SC/MCB/007"
+                          className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[var(--ring)] uppercase"
+                        />
+                      </div>
+                    )}
                     <div>
                       <label className="block text-xs font-medium text-[var(--foreground)] mb-1">Full Name *</label>
                       <input required type="text" value={regForm.fullName} onChange={e => setRegForm({...regForm, fullName: e.target.value})} placeholder="Firstname Middlename Surname" className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" />
@@ -439,8 +450,22 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
                     </div>
 
                     <div className="flex gap-2 pt-2">
-                      <button type="button" onClick={() => setRegStep(memberType === "alumni" ? "matric" : "type")} className="px-4 py-2.5 border border-[var(--border)] rounded-lg text-sm font-medium hover:border-[var(--primary)] transition-colors">← Back</button>
-                      <button type="button" onClick={() => { if (regForm.fullName && regForm.email && regForm.phone) setRegStep("security"); }} className="flex-1 py-2.5 bg-[var(--primary)] text-white font-semibold rounded-lg text-sm hover:bg-[var(--accent)] transition-colors">
+                      <button type="button" onClick={() => setRegStep("type")} className="px-4 py-2.5 border border-[var(--border)] rounded-lg text-sm font-medium hover:border-[var(--primary)] transition-colors">← Back</button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (memberType === "alumni" && !matricNumber) {
+                            showToast("Please enter your matriculation number.", "error");
+                            return;
+                          }
+                          if (regForm.fullName && regForm.email && regForm.phone) {
+                            setRegStep("security");
+                          } else {
+                            showToast("Please fill in all required fields (Full Name, Email, Phone).", "error");
+                          }
+                        }}
+                        className="flex-1 py-2.5 bg-[var(--primary)] text-white font-semibold rounded-lg text-sm hover:bg-[var(--accent)] transition-colors"
+                      >
                         Continue →
                       </button>
                     </div>

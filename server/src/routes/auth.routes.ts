@@ -16,12 +16,17 @@ import { authLimiter } from "../middleware/rateLimit.js";
 const router = Router();
 
 const alumniRegisterSchema = z.object({
-  matricNumber: z.string().min(3),
+  matricNumber: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   phone: z.string().optional(),
+  department: z.string().optional(),
+  profession: z.string().optional(),
+  gradSet: z.string().optional(),
+  faculty: z.string().optional(),
+  location: z.string().optional(),
 });
 
 const associateRegisterSchema = z.object({
@@ -68,24 +73,13 @@ router.post(
   validateBody(alumniRegisterSchema),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { matricNumber, email, password, firstName, lastName, phone } = req.body;
+      const { matricNumber, email, password, firstName, lastName, phone, department, profession, gradSet, faculty } = req.body;
+      const normalizedMatric = String(matricNumber).trim().toUpperCase();
 
-      // 1. Check Official Directory
-      const officialEntry = await prisma.officialAlumniDirectory.findUnique({
-        where: { matricNumber },
-      });
-
-      if (!officialEntry) {
-        return res.status(400).json({
-          error:
-            "Matriculation number not found in the official alumni directory. Please verify your matric number or apply for Associate Membership.",
-        });
-      }
-
-      // 2. Check duplicate registration
+      // Check duplicate registration
       const existingMember = await prisma.member.findFirst({
         where: {
-          OR: [{ email }, { matricNumber }],
+          OR: [{ email }, { matricNumber: normalizedMatric }],
         },
       });
 
@@ -95,28 +89,41 @@ router.post(
         });
       }
 
+      // Find or connect graduating set / faculty if names provided
+      let graduatingSetId: string | undefined;
+      let facultyId: string | undefined;
+
+      if (gradSet) {
+        const setObj = await prisma.graduatingSet.findFirst({
+          where: { setName: { equals: gradSet, mode: "insensitive" } },
+        });
+        if (setObj) graduatingSetId = setObj.id;
+      }
+
+      if (faculty) {
+        const facObj = await prisma.faculty.findFirst({
+          where: { name: { equals: faculty, mode: "insensitive" } },
+        });
+        if (facObj) facultyId = facObj.id;
+      }
+
       const passwordHash = await bcrypt.hash(password, 10);
 
       const newMember = await prisma.member.create({
         data: {
           email,
           passwordHash,
-          matricNumber,
-          firstName: firstName || officialEntry.firstName,
-          lastName: lastName || officialEntry.lastName,
+          matricNumber: normalizedMatric,
+          firstName,
+          lastName,
           phone,
-          graduatingSetId: officialEntry.graduatingSetId,
-          facultyId: officialEntry.facultyId,
-          department: officialEntry.department,
+          department,
+          profession,
+          graduatingSetId,
+          facultyId,
           memberType: "ALUMNI",
-          verificationStatus: "VERIFIED", // Pre-verified from official directory
+          verificationStatus: "VERIFIED",
         },
-      });
-
-      // Mark official directory record as registered
-      await prisma.officialAlumniDirectory.update({
-        where: { id: officialEntry.id },
-        data: { isRegistered: true },
       });
 
       const tokenPayload = {
