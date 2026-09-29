@@ -148,7 +148,7 @@ export default function Gallery({ onNavigate }: GalleryProps) {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {filtered.map((album) => {
-              const coverImg = album.photos?.[0]?.media?.url || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=400&fit=crop&auto=format";
+              const coverImg = album.photos?.[0]?.media?.secureUrl || album.photos?.[0]?.media?.url || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=400&fit=crop&auto=format";
               const photoCount = album._count?.photos || album.photos?.length || 0;
 
               return (
