@@ -104,6 +104,18 @@ router.post("/faculties", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN"), 
   }
 });
 
+// DELETE /api/admin/faculties/:id
+router.delete("/faculties/:id", authenticateJWT, requireRole("ADMIN", "SUPER_ADMIN"), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    await prisma.faculty.delete({ where: { id } });
+    return res.json({ message: "Faculty deleted successfully" });
+  } catch (err) {
+    console.error("Delete faculty error:", err);
+    return res.status(500).json({ error: "Failed to delete faculty" });
+  }
+});
+
 // GET /api/admin/sets
 router.get("/sets", async (req, res) => {
   try {

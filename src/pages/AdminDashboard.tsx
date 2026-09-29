@@ -34,6 +34,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [rosterSearch, setRosterSearch] = useState("");
 
   // Modals state
+  const [showFacultyModal, setShowFacultyModal] = useState(false);
   const [showSetModal, setShowSetModal] = useState(false);
   const [showEventModal, setShowEventModal] = useState(false);
   const [showNewsModal, setShowNewsModal] = useState(false);
@@ -58,6 +59,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [isAdminSubmitting, setIsAdminSubmitting] = useState(false);
 
   // Forms
+  const [facultyForm, setFacultyForm] = useState({ name: "", code: "" });
   const [setForm, setSetForm] = useState({ setName: "", graduationYear: new Date().getFullYear(), description: "" });
   const [eventForm, setEventForm] = useState({ title: "", description: "", date: "", time: "", venue: "", category: "General", organizer: "CUAA" });
   const [newsForm, setNewsForm] = useState({ title: "", content: "", category: "OFFICIAL_ANNOUNCEMENT" });
@@ -319,6 +321,33 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       fetchData();
     } catch (err: any) {
       showToast(err.message || "Failed to delete announcement", "error");
+    }
+  };
+
+  const handleCreateFaculty = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await apiFetch("/api/admin/faculties", {
+        method: "POST",
+        body: JSON.stringify(facultyForm),
+      });
+      showToast("Faculty created successfully!", "success");
+      setShowFacultyModal(false);
+      setFacultyForm({ name: "", code: "" });
+      fetchData();
+    } catch (err: any) {
+      showToast(err.message || "Failed to create faculty", "error");
+    }
+  };
+
+  const handleDeleteFaculty = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this faculty?")) return;
+    try {
+      await apiFetch(`/api/admin/faculties/${id}`, { method: "DELETE" });
+      showToast("Faculty deleted successfully.", "success");
+      fetchData();
+    } catch (err: any) {
+      showToast(err.message || "Failed to delete faculty", "error");
     }
   };
 
@@ -607,6 +636,11 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                     <span className="text-lg block mb-1">🎓</span>
                     <strong>Add Official Matric</strong>
                     <p className="text-[10px] text-[var(--muted-foreground)]">Add to Official Alumni Directory</p>
+                  </button>
+                  <button onClick={() => setShowFacultyModal(true)} className="p-3 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] text-left">
+                    <span className="text-lg block mb-1">🏢</span>
+                    <strong>Manage Faculties ({faculties.length})</strong>
+                    <p className="text-[10px] text-[var(--muted-foreground)]">Add/Delete Faculties & Programmes</p>
                   </button>
                   <button onClick={() => setShowSetModal(true)} className="p-3 border border-[var(--border)] rounded text-xs font-medium hover:border-[var(--primary)] text-left">
                     <span className="text-lg block mb-1">🏛️</span>
@@ -1567,6 +1601,60 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
             <div className="flex justify-end pt-2 border-t border-[var(--border)]">
               <button onClick={() => setSelectedMemberDetail(null)} className="px-5 py-2 bg-[var(--primary)] text-white rounded text-xs font-semibold">Close Profile</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Faculties & Departments Modal */}
+      {showFacultyModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowFacultyModal(false)}>
+          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center border-b border-[var(--border)] pb-3">
+              <div>
+                <h3 className="font-bold text-lg text-[var(--secondary)]">Manage Faculties & Programmes</h3>
+                <p className="text-xs text-[var(--muted-foreground)]">Create new university faculties or delete existing ones.</p>
+              </div>
+              <button onClick={() => setShowFacultyModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">✕</button>
+            </div>
+
+            {/* Add Faculty Form */}
+            <form onSubmit={handleCreateFaculty} className="bg-[var(--muted)] p-3 rounded-lg space-y-2 text-xs">
+              <p className="font-bold text-[var(--foreground)]">+ Add New Faculty</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-medium mb-0.5">Faculty Name *</label>
+                  <input required type="text" placeholder="e.g. Faculty of Engineering" value={facultyForm.name} onChange={e => setFacultyForm({ ...facultyForm, name: e.target.value })} className="w-full p-1.5 border rounded bg-white" />
+                </div>
+                <div>
+                  <label className="block font-medium mb-0.5">Faculty Code (Optional)</label>
+                  <input type="text" placeholder="e.g. ENG" value={facultyForm.code} onChange={e => setFacultyForm({ ...facultyForm, code: e.target.value })} className="w-full p-1.5 border rounded bg-white uppercase font-mono" />
+                </div>
+              </div>
+              <button type="submit" className="w-full py-1.5 bg-[var(--primary)] text-white rounded font-bold hover:bg-[var(--accent)]">
+                Create Faculty
+              </button>
+            </form>
+
+            {/* Faculties List */}
+            <div>
+              <p className="font-bold text-xs text-[var(--foreground)] mb-2">Existing Faculties ({faculties.length}):</p>
+              <div className="divide-y divide-[var(--border)] max-h-48 overflow-y-auto border rounded">
+                {faculties.map(f => (
+                  <div key={f.id} className="p-2.5 flex items-center justify-between text-xs">
+                    <div>
+                      <p className="font-bold text-[var(--foreground)]">{f.name}</p>
+                      {f.code && <p className="text-[10px] font-mono text-[var(--primary)]">Code: {f.code}</p>}
+                    </div>
+                    <button onClick={() => handleDeleteFaculty(f.id)} className="px-2 py-1 bg-red-100 text-red-700 rounded text-[10px] font-bold hover:bg-red-200">
+                      Delete
+                    </button>
+                  </div>
+                ))}
+                {faculties.length === 0 && <p className="p-4 text-center text-xs text-[var(--muted-foreground)]">No faculties found.</p>}
+              </div>
+            </div>
+
+            <button onClick={() => setShowFacultyModal(false)} className="w-full py-2 bg-[var(--primary)] text-white rounded text-xs font-semibold">Close</button>
           </div>
         </div>
       )}
