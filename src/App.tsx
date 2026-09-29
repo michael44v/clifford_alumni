@@ -19,15 +19,19 @@ import Contact from "@/pages/Contact";
 import LoginJoin from "@/pages/LoginJoin";
 import MemberDashboard from "@/pages/MemberDashboard";
 import AdminDashboard from "@/pages/AdminDashboard";
+import PasscodePurchase from "@/pages/PasscodePurchase";
+import StudyMode from "@/pages/StudyMode";
+import PasscodeLogin from "@/pages/PasscodeLogin";
+import ExamInterface from "@/pages/ExamInterface";
 
 export type Page =
   | "home" | "about" | "directory" | "events" | "news"
   | "career" | "business" | "welfare" | "leadership" | "gallery"
   | "finance" | "donate" | "contact" | "login" | "register"
-  | "dashboard" | "admin";
+  | "dashboard" | "admin" | "passcode" | "passcode-purchase" | "study" | "exam";
 
-const NO_FOOTER: Page[] = ["admin"];
-const NO_NAV: Page[] = ["admin"];
+const NO_FOOTER: Page[] = ["admin", "exam"];
+const NO_NAV: Page[] = ["admin", "exam"];
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>("home");
@@ -101,6 +105,10 @@ export default function App() {
         {currentPage === "finance"    && <Finance onNavigate={navigate} isLoggedIn={isLoggedIn} />}
         {currentPage === "donate"     && <Donate onNavigate={navigate} isLoggedIn={isLoggedIn} />}
         {currentPage === "contact"    && <Contact onNavigate={navigate} />}
+        {currentPage === "passcode-purchase" && <PasscodePurchase onNavigate={navigate} isLoggedIn={isLoggedIn} />}
+        {currentPage === "passcode"   && <PasscodeLogin onNavigate={navigate} />}
+        {currentPage === "study"      && <StudyMode onNavigate={navigate} />}
+        {currentPage === "exam"       && <ExamInterface onNavigate={navigate} />}
         {(currentPage === "login" || currentPage === "register") && (
           <LoginJoin mode={currentPage} onLogin={handleLogin} onNavigate={navigate} />
         )}

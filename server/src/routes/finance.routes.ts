@@ -4,8 +4,18 @@ import { prisma } from "../db/prisma.js";
 import { authenticateJWT, requireRole, AuthenticatedRequest } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { PaymentMethod, DuesType } from "@prisma/client";
+import { sendPasscodePaymentEmail } from "../utils/emailService.js";
 
 const router = Router();
+
+const buyPasscodeSchema = z.object({
+  email: z.string().email(),
+  candidateName: z.string().min(1),
+  deviceCount: z.number().int().min(1).default(1),
+  durationMonths: z.number().int().min(1).default(1),
+  amount: z.number().positive(),
+  paymentRef: z.string().optional(),
+});
 
 const createDuesSchema = z.object({
   title: z.string().min(3),
@@ -335,6 +345,39 @@ router.get("/history", authenticateJWT, async (req: AuthenticatedRequest, res: R
     return res.json(history);
   } catch (err) {
     return res.status(500).json({ error: "Failed to fetch payment history" });
+  }
+});
+
+// POST /api/finance/buy-passcode (Purchase passcode & dispatch email notification)
+router.post("/buy-passcode", validateBody(buyPasscodeSchema), async (req, res) => {
+  try {
+    const { email, candidateName, deviceCount, durationMonths, amount, paymentRef } = req.body;
+
+    const generatedPasscode = "PASS-" + Math.floor(100000 + Math.random() * 900000);
+    const ref = paymentRef || "PASS-TXN-" + Date.now();
+
+    // Trigger SMTP email sending helper asynchronously
+    await sendPasscodePaymentEmail({
+      toEmail: email,
+      candidateName,
+      passcode: generatedPasscode,
+      deviceCount,
+      durationMonths,
+      amount,
+      paymentRef: ref,
+    });
+
+    return res.status(201).json({
+      message: "Passcode purchased successfully and confirmation email sent.",
+      passcode: generatedPasscode,
+      email,
+      deviceCount,
+      amount,
+      paymentRef: ref,
+    });
+  } catch (err) {
+    console.error("Passcode purchase error:", err);
+    return res.status(500).json({ error: "Failed to process passcode purchase" });
   }
 });
 

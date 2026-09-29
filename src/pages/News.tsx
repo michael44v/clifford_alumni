@@ -14,11 +14,20 @@ export default function News({ onNavigate }: NewsProps) {
 
   useEffect(() => {
     setLoading(true);
-    let url = "/api/news";
-    if (activeCategory !== "All") url += `?category=${encodeURIComponent(activeCategory)}`;
+    // Configurable news endpoint placeholder (VITE_NEWS_API_ENDPOINT or default /api/news)
+    const newsEndpointBase = import.meta.env.VITE_NEWS_API_ENDPOINT || "/api/news";
+    let url = newsEndpointBase;
+    if (activeCategory !== "All") {
+      const paramChar = url.includes("?") ? "&" : "?";
+      url += `${paramChar}category=${encodeURIComponent(activeCategory)}`;
+    }
+
     apiFetch(url)
-      .then(res => setArticles(res.data || []))
-      .catch(err => console.error(err))
+      .then(res => setArticles(res.data || (Array.isArray(res) ? res : [])))
+      .catch(err => {
+        console.error("Failed to fetch news from endpoint:", url, err);
+        setArticles([]);
+      })
       .finally(() => setLoading(false));
   }, [activeCategory]);
 
