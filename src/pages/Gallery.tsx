@@ -13,6 +13,7 @@ export default function Gallery({ onNavigate }: GalleryProps) {
   const [albums, setAlbums] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedAlbum, setSelectedAlbum] = useState<any | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<any | null>(null);
 
   // Upload modal state
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -205,9 +206,16 @@ export default function Gallery({ onNavigate }: GalleryProps) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 py-2">
               {(selectedAlbum.photos || []).map((p: any) => (
-                <div key={p.id} className="bg-slate-50 border border-[var(--border)] rounded-lg overflow-hidden flex flex-col">
-                  <div className="h-48 bg-[var(--muted)] overflow-hidden">
-                    <img src={p.media?.secureUrl} alt={p.caption || "Gallery photo"} className="w-full h-full object-cover" />
+                <div
+                  key={p.id}
+                  onClick={() => setSelectedPhoto(p)}
+                  className="bg-slate-50 border border-[var(--border)] rounded-lg overflow-hidden flex flex-col cursor-pointer group hover:border-[var(--primary)] transition-all shadow-sm hover:shadow-md"
+                >
+                  <div className="h-48 bg-[var(--muted)] overflow-hidden relative">
+                    <img src={p.media?.secureUrl || p.media?.url} alt={p.caption || "Gallery photo"} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                      <span className="text-white text-2xl opacity-0 group-hover:opacity-100 transition-opacity font-bold bg-black/40 px-3 py-1 rounded-full">🔍 View Photo</span>
+                    </div>
                   </div>
                   {p.caption && (
                     <p className="p-2.5 text-xs text-[var(--foreground)] font-medium leading-snug">{p.caption}</p>
@@ -227,6 +235,48 @@ export default function Gallery({ onNavigate }: GalleryProps) {
             <div className="flex justify-end pt-2 border-t border-[var(--border)]">
               <button onClick={() => setSelectedAlbum(null)} className="px-5 py-2 bg-[var(--primary)] text-white rounded text-xs font-semibold">Close Album</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Photo Lightbox / Zoom Modal with Close Button */}
+      {selectedPhoto && (
+        <div className="fixed inset-0 bg-black/85 z-[60] flex items-center justify-center p-4" onClick={() => setSelectedPhoto(null)}>
+          <div className="relative max-w-4xl w-full bg-black/90 text-white rounded-xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+            {/* Header with Close Button */}
+            <div className="flex justify-between items-center px-4 py-3 bg-black/60 border-b border-white/10">
+              <span className="text-xs text-white/70 font-medium">Photo Lightbox</span>
+              <button
+                onClick={() => setSelectedPhoto(null)}
+                className="px-3 py-1 bg-white/20 hover:bg-white/40 text-white text-sm font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                aria-label="Close photo"
+              >
+                <span>✕</span> Close
+              </button>
+            </div>
+
+            {/* Main Image Container */}
+            <div className="flex-1 overflow-hidden flex items-center justify-center p-4 bg-black">
+              <img
+                src={selectedPhoto.media?.secureUrl || selectedPhoto.media?.url}
+                alt={selectedPhoto.caption || "Full view gallery photo"}
+                className="max-h-[70vh] w-auto max-w-full object-contain rounded"
+              />
+            </div>
+
+            {/* Caption & Metadata Footer */}
+            {(selectedPhoto.caption || selectedPhoto.uploadedBy) && (
+              <div className="px-6 py-4 bg-black/80 border-t border-white/10 text-center space-y-1">
+                {selectedPhoto.caption && (
+                  <p className="text-sm font-semibold text-white">{selectedPhoto.caption}</p>
+                )}
+                {selectedPhoto.uploadedBy && (
+                  <p className="text-xs text-white/60">
+                    Uploaded by {selectedPhoto.uploadedBy.firstName} {selectedPhoto.uploadedBy.lastName}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
