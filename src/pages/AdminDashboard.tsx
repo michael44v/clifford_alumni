@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "../lib/api";
 import { showToast } from "../components/Toast";
+import QuestionUpload from "../components/QuestionUpload";
 
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface AdminDashboardProps { onNavigate: (page: Page) => void; onLogout: () => void; }
 
-type AdminTab = "overview" | "roster" | "members" | "media" | "welfare" | "payments" | "donations" | "content" | "settings";
+type AdminTab = "overview" | "questions" | "roster" | "members" | "media" | "welfare" | "payments" | "donations" | "content" | "settings";
 
 export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
@@ -579,12 +580,17 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {/* Navigation Tabs */}
         <div className="flex overflow-x-auto gap-1 bg-white border border-[var(--border)] p-1 rounded mb-6">
-          {(["overview", "roster", "members", "media", "welfare", "payments", "donations", "content", "settings"] as AdminTab[]).map(tab => (
+          {(["overview", "questions", "roster", "members", "media", "welfare", "payments", "donations", "content", "settings"] as AdminTab[]).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-shrink-0 px-4 py-2 rounded text-xs font-medium capitalize whitespace-nowrap transition-colors ${activeTab === tab ? "bg-[var(--secondary)] text-white" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}>
-              {tab === "roster" ? "Official Roster" : tab === "media" ? "Media Gallery" : tab} {tab === "members" && pendingMembers.length > 0 ? `(${pendingMembers.length})` : ""}
+              {tab === "questions" ? "Question Upload (KaTeX)" : tab === "roster" ? "Official Roster" : tab === "media" ? "Media Gallery" : tab} {tab === "members" && pendingMembers.length > 0 ? `(${pendingMembers.length})` : ""}
             </button>
           ))}
         </div>
+
+        {/* Question Upload Tab */}
+        {activeTab === "questions" && (
+          <QuestionUpload />
+        )}
 
         {/* Overview Tab */}
         {activeTab === "overview" && (
