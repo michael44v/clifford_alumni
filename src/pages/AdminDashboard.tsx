@@ -34,6 +34,12 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [memberFilterStatus, setMemberFilterStatus] = useState("");
   const [rosterSearch, setRosterSearch] = useState("");
 
+  // Replace Photo Modal state
+  const [showReplaceModal, setShowReplaceModal] = useState(false);
+  const [replacePhotoId, setReplacePhotoId] = useState("");
+  const [replacePhotoUrl, setReplacePhotoUrl] = useState("");
+  const [replacePhotoCaption, setReplacePhotoCaption] = useState("");
+
   // Modals state
   const [showFacultyModal, setShowFacultyModal] = useState(false);
   const [showDepartmentModal, setShowDepartmentModal] = useState(false);
@@ -67,7 +73,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [setForm, setSetForm] = useState({ setName: "", graduationYear: new Date().getFullYear(), description: "" });
   const [eventForm, setEventForm] = useState({ title: "", description: "", date: "", time: "", venue: "", category: "General", organizer: "CUAA" });
   const [newsForm, setNewsForm] = useState({ title: "", content: "", category: "OFFICIAL_ANNOUNCEMENT" });
-  const [leadershipForm, setLeadershipForm] = useState({ name: "", position: "", biography: "", termStart: new Date().getFullYear(), photoUrl: "" });
+  const [leadershipForm, setLeadershipForm] = useState({ name: "", position: "", biography: "", termStart: new Date().getFullYear(), photoUrl: "", memberId: "" });
   const [aotwBio, setAotwBio] = useState("");
   const [rosterForm, setRosterForm] = useState({ matricNumber: "", firstName: "", lastName: "", facultyId: "", graduatingSetId: "", department: "" });
   const [duesForm, setDuesForm] = useState({ title: "", amount: "", type: "ANNUAL_DUES", academicYear: "2024/2025", description: "" });
@@ -180,6 +186,31 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       fetchData();
     } catch (err: any) {
       showToast(err.message || "Failed to delete photo", "error");
+    }
+  };
+
+  const handleReplacePhotoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replacePhotoUrl) {
+      alert("Please enter a valid replacement image URL or upload an image file.");
+      return;
+    }
+    try {
+      await apiFetch(`/api/admin/gallery/photos/${replacePhotoId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          photoUrl: replacePhotoUrl,
+          caption: replacePhotoCaption,
+        }),
+      });
+      showToast("Photo replaced successfully!", "success");
+      setShowReplaceModal(false);
+      setReplacePhotoId("");
+      setReplacePhotoUrl("");
+      setReplacePhotoCaption("");
+      fetchData();
+    } catch (err: any) {
+      showToast(err.message || "Failed to replace photo", "error");
     }
   };
 
@@ -929,6 +960,17 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                         {photo.isFeatured ? "Unfeature" : "+ Add to Landing Page"}
                       </button>
                       <button
+                        onClick={() => {
+                          setReplacePhotoId(photo.id);
+                          setReplacePhotoUrl(photo.media?.secureUrl || "");
+                          setReplacePhotoCaption(photo.caption || "");
+                          setShowReplaceModal(true);
+                        }}
+                        className="px-2.5 py-1.5 bg-blue-100 text-blue-700 font-bold rounded text-[11px] hover:bg-blue-200"
+                      >
+                        Replace
+                      </button>
+                      <button
                         onClick={() => handleDeletePhoto(photo.id)}
                         className="px-2.5 py-1.5 bg-red-100 text-red-700 font-bold rounded text-[11px] hover:bg-red-200"
                       >
@@ -1312,6 +1354,73 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
           </div>
         )}
       </div>
+
+      {/* Admin Replace Photo Modal */}
+      {showReplaceModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex justify-between items-center border-b border-[var(--border)] pb-3">
+              <h3 className="font-bold text-lg text-[var(--secondary)]">Replace Gallery Photo</h3>
+              <button onClick={() => setShowReplaceModal(false)} className="text-gray-400 hover:text-gray-600 font-bold">✕</button>
+            </div>
+
+            <form onSubmit={handleReplacePhotoSubmit} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-medium mb-1">Select New Image File</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setReplacePhotoUrl(reader.result as string);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  className="w-full text-xs border p-1 rounded bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1">Or New Image URL</label>
+                <input
+                  type="text"
+                  placeholder="https://..."
+                  value={replacePhotoUrl.startsWith("data:") ? "[Local File Selected]" : replacePhotoUrl}
+                  onChange={e => setReplacePhotoUrl(e.target.value)}
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium mb-1">Caption / Description</label>
+                <input
+                  type="text"
+                  value={replacePhotoCaption}
+                  onChange={e => setReplacePhotoCaption(e.target.value)}
+                  className="w-full p-2 border rounded"
+                />
+              </div>
+
+              {replacePhotoUrl && (
+                <div className="h-28 w-28 mx-auto rounded overflow-hidden border">
+                  <img src={replacePhotoUrl} alt="Preview" className="w-full h-full object-cover" />
+                </div>
+              )}
+
+              <div className="flex gap-2 justify-end pt-2 border-t">
+                <button type="button" onClick={() => setShowReplaceModal(false)} className="px-4 py-2 border rounded font-medium">Cancel</button>
+                <button type="submit" className="px-5 py-2 bg-[var(--primary)] text-white rounded font-bold hover:bg-[var(--accent)]">
+                  Save Replacement
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Admin Photo Upload Modal */}
       {showAdminUploadModal && (
@@ -2124,8 +2233,37 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       {showLeadershipModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6">
-            <h3 className="font-bold text-lg mb-4">{editingLeader ? "Edit EXCO Leader Profile" : "Add EXCO Leader Profile"}</h3>
+            <h3 className="font-bold text-lg mb-4">{editingLeader ? "Edit EXCO Leader Profile" : "Add / Elevate EXCO Leader Profile"}</h3>
             <form onSubmit={handleCreateLeadership} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-medium mb-1">Elevate Registered Alumni (Optional)</label>
+                <select
+                  value={leadershipForm.memberId}
+                  onChange={e => {
+                    const selectedId = e.target.value;
+                    const found = members.find(m => m.id === selectedId);
+                    if (found) {
+                      setLeadershipForm({
+                        ...leadershipForm,
+                        memberId: selectedId,
+                        name: `${found.firstName} ${found.lastName}`,
+                        biography: leadershipForm.biography || found.bio || `${found.firstName} ${found.lastName} is a graduate of Clifford University (${found.graduatingSet?.setName || ''}) and active EXCO member.`,
+                        photoUrl: leadershipForm.photoUrl || found.profilePhoto?.secureUrl || "",
+                      });
+                    } else {
+                      setLeadershipForm({ ...leadershipForm, memberId: "" });
+                    }
+                  }}
+                  className="w-full p-2 border rounded bg-white"
+                >
+                  <option value="">-- Select Member to Elevate or Type Name Below --</option>
+                  {members.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.firstName} {m.lastName} ({m.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="block font-medium mb-1">Full Name *</label>
                 <input required type="text" value={leadershipForm.name} onChange={e => setLeadershipForm({...leadershipForm, name: e.target.value})} className="w-full p-2 border rounded" />
