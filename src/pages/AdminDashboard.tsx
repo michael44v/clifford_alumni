@@ -1615,7 +1615,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
             <div className="flex justify-between items-start border-b border-[var(--border)] pb-4">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[var(--primary)] bg-[var(--muted)] flex-shrink-0">
-                  <img src={selectedMemberDetail.profilePhoto?.secureUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&auto=format"} alt={selectedMemberDetail.firstName} className="w-full h-full object-cover" />
+                  <img src={selectedMemberDetail.profilePhotoUrl || selectedMemberDetail.profilePhoto?.secureUrl || "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg"} alt={selectedMemberDetail.firstName} className="w-full h-full object-cover" />
                 </div>
                 <div>
                   <h2 className="font-display text-xl font-bold text-[var(--secondary)]">{selectedMemberDetail.firstName} {selectedMemberDetail.lastName}</h2>

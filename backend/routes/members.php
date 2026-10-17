@@ -74,7 +74,7 @@ function handleMemberRoutes(string $endpoint, string $method): void {
         jsonResponse($member);
     }
 
-    if ($method === 'PUT' && $endpoint === '/api/members/profile') {
+    if ($method === 'PUT' && ($endpoint === '/api/members/me' || $endpoint === '/api/members/profile')) {
         $body = getRequestBody();
         $firstName = trim($body['firstName'] ?? '');
         $lastName = trim($body['lastName'] ?? '');
@@ -84,6 +84,21 @@ function handleMemberRoutes(string $endpoint, string $method): void {
         $bio = trim($body['bio'] ?? '');
         $diasporaCountry = trim($body['diasporaCountry'] ?? '');
         $diasporaCity = trim($body['diasporaCity'] ?? '');
+        $profilePhotoUrl = trim($body['profilePhotoUrl'] ?? '');
+
+        // Handle profile photo media if provided
+        $mediaId = null;
+        if (!empty($profilePhotoUrl) && $profilePhotoUrl !== '[File Selected]') {
+            $existingMember = dbQueryOne("SELECT profilePhotoMediaId FROM members WHERE id = ?", [$user['id']]);
+            if (!empty($existingMember['profilePhotoMediaId'])) {
+                dbQuery("UPDATE media SET secureUrl = ? WHERE id = ?", [$profilePhotoUrl, $existingMember['profilePhotoMediaId']]);
+            } else {
+                $mediaId = generateUuid();
+                dbQuery("INSERT INTO media (id, cloudinaryPublicId, secureUrl, resourceType, folder) VALUES (?, ?, ?, 'image', 'alumni/avatars')",
+                    [$mediaId, 'avatar_' . $user['id'] . '_' . time(), $profilePhotoUrl]);
+                dbQuery("UPDATE members SET profilePhotoMediaId = ? WHERE id = ?", [$mediaId, $user['id']]);
+            }
+        }
 
         dbQuery("UPDATE members SET
             firstName = COALESCE(NULLIF(?, ''), firstName),
@@ -97,8 +112,15 @@ function handleMemberRoutes(string $endpoint, string $method): void {
             updatedAt = CURRENT_TIMESTAMP
             WHERE id = ?", [$firstName, $lastName, $phone, $profession, $company, $bio, $diasporaCountry, $diasporaCity, $user['id']]);
 
-        $upd = dbQueryOne("SELECT * FROM members WHERE id = ?", [$user['id']]);
-        unset($upd['passwordHash']);
+        $upd = dbQueryOne("SELECT m.*, g.setName, f.name as facultyName, med.secureUrl as profilePhotoUrl
+                           FROM members m
+                           LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id
+                           LEFT JOIN faculties f ON m.facultyId = f.id
+                           LEFT JOIN media med ON m.profilePhotoMediaId = med.id
+                           WHERE m.id = ?", [$user['id']]);
+        if ($upd) {
+            unset($upd['passwordHash']);
+        }
         jsonResponse($upd);
     }
 }

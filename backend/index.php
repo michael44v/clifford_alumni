@@ -4,6 +4,9 @@
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/utils/response.php';
+require_once __DIR__ . '/utils/logger.php';
+
+$startTime = microtime(true);
 
 require_once __DIR__ . '/routes/auth.php';
 require_once __DIR__ . '/routes/admin.php';
@@ -95,9 +98,14 @@ try {
     }
 
     // Fallback 404 for unknown endpoints
+    $execTime = (microtime(true) - $startTime) * 1000;
+    logApiRequest($method, $endpoint, 404, $execTime, "Route not found");
     jsonError("Route not found: {$method} {$endpoint}", 404);
 
 } catch (Throwable $e) {
-    error_log("Backend API Exception: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
+    $execTime = (microtime(true) - $startTime) * 1000;
+    $err = $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine();
+    logApiRequest($method, $endpoint, 500, $execTime, $err);
+    error_log("Backend API Exception: " . $err);
     jsonError("An internal server error occurred: " . $e->getMessage(), 500);
 }
