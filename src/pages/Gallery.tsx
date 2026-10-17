@@ -46,6 +46,20 @@ export default function Gallery({ onNavigate }: GalleryProps) {
     }
   };
 
+  const handleDeleteAlbumPhoto = async (photoId: string) => {
+    if (!confirm("Are you sure you want to delete this photo?")) return;
+    try {
+      await apiFetch(`/api/gallery/photos/${photoId}`, { method: "DELETE" });
+      showToast("Photo deleted", "success");
+      if (selectedAlbum) {
+        fetchAlbumDetail(selectedAlbum.id);
+      }
+      fetchAlbums();
+    } catch (err: any) {
+      showToast(err.message || "Failed to delete photo", "error");
+    }
+  };
+
   const handleAddImageUrl = () => {
     setImageUrls([...imageUrls, ""]);
     setCaptions([...captions, ""]);
@@ -213,9 +227,10 @@ export default function Gallery({ onNavigate }: GalleryProps) {
                     <p className="p-2.5 text-xs text-[var(--foreground)] font-medium leading-snug">{p.caption}</p>
                   )}
                   {p.uploadedBy && (
-                    <p className="p-2 text-[10px] text-[var(--muted-foreground)] bg-slate-100 border-t border-[var(--border)] mt-auto">
-                      Uploaded by: <strong>{p.uploadedBy.firstName} {p.uploadedBy.lastName}</strong>
-                    </p>
+                    <div className="p-2 text-[10px] text-[var(--muted-foreground)] bg-slate-100 border-t border-[var(--border)] mt-auto flex justify-between items-center">
+                      <span>Uploaded by: <strong>{p.uploadedBy.firstName} {p.uploadedBy.lastName}</strong></span>
+                      <button onClick={() => handleDeleteAlbumPhoto(p.id)} className="text-red-600 hover:underline font-bold text-[10px]">Delete</button>
+                    </div>
                   )}
                 </div>
               ))}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import campusPhoto from "@/imports/ChatGPT_Image_Sep_11__2026__04_05_20_PM.png";
-import cuaaLogo from "@/imports/CUAA.jpg";
 import { apiFetch } from "../lib/api";
+import { CardSkeleton, Skeleton } from "../components/Skeleton";
 
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 
@@ -19,15 +19,6 @@ const quickActions = [
   { icon: "❤️", label: "Donate", desc: "Support the community", page: "donate" as Page },
 ];
 
-const galleryImages = [
-  "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=400&h=300&fit=crop&auto=format",
-  "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=300&fit=crop&auto=format",
-  "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=400&h=300&fit=crop&auto=format",
-  "https://images.unsplash.com/photo-1531545514256-b1400bc00f31?w=400&h=300&fit=crop&auto=format",
-  "https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?w=400&h=300&fit=crop&auto=format",
-  "https://images.unsplash.com/photo-1580894742597-87bc8789db3d?w=400&h=300&fit=crop&auto=format",
-];
-
 export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
   const [events, setEvents] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -35,33 +26,68 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
   const [alumniOfWeek, setAlumniOfWeek] = useState<any | null>(null);
   const [leadership, setLeadership] = useState<any[]>([]);
   const [showcasePhotos, setShowcasePhotos] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
+
+  // Loading States
+  const [isLoadingEvents, setIsLoadingEvents] = useState(true);
+  const [isLoadingAnnouncements, setIsLoadingAnnouncements] = useState(true);
+  const [isLoadingFeatured, setIsLoadingFeatured] = useState(true);
+  const [isLoadingAlumniOfWeek, setIsLoadingAlumniOfWeek] = useState(true);
+  const [isLoadingLeadership, setIsLoadingLeadership] = useState(true);
+  const [isLoadingShowcase, setIsLoadingShowcase] = useState(true);
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
 
   useEffect(() => {
-    // Realtime database fetches
+    // Fetch stats
+    setIsLoadingStats(true);
+    apiFetch("/api/finance/impact-stats")
+      .then(res => setStats(res))
+      .catch(() => setStats(null))
+      .finally(() => setIsLoadingStats(false));
+
+    // Fetch Events
+    setIsLoadingEvents(true);
     apiFetch("/api/events")
       .then(res => setEvents(Array.isArray(res) ? res : (res?.data || [])))
-      .catch(() => setEvents([]));
+      .catch(() => setEvents([]))
+      .finally(() => setIsLoadingEvents(false));
 
+    // Fetch News
+    setIsLoadingAnnouncements(true);
     apiFetch("/api/news")
       .then(res => setAnnouncements(Array.isArray(res) ? res : (res?.data || [])))
-      .catch(() => setAnnouncements([]));
+      .catch(() => setAnnouncements([]))
+      .finally(() => setIsLoadingAnnouncements(false));
 
+    // Fetch Leadership
+    setIsLoadingLeadership(true);
     apiFetch("/api/admin/leadership")
       .then(res => setLeadership(Array.isArray(res) ? res : []))
-      .catch(() => setLeadership([]));
+      .catch(() => setLeadership([]))
+      .finally(() => setIsLoadingLeadership(false));
 
+    // Fetch Alumni of the week
+    setIsLoadingAlumniOfWeek(true);
     apiFetch("/api/members/alumni-of-the-week")
       .then(res => setAlumniOfWeek(res || null))
-      .catch(() => setAlumniOfWeek(null));
+      .catch(() => setAlumniOfWeek(null))
+      .finally(() => setIsLoadingAlumniOfWeek(false));
 
+    // Fetch Showcase Photos
+    setIsLoadingShowcase(true);
     apiFetch("/api/gallery/landing-page")
       .then(res => setShowcasePhotos(Array.isArray(res) ? res : []))
-      .catch(() => setShowcasePhotos([]));
+      .catch(() => setShowcasePhotos([]))
+      .finally(() => setIsLoadingShowcase(false));
 
+    // Fetch Featured Alumni
+    setIsLoadingFeatured(true);
     apiFetch("/api/members/featured")
       .then(res => setFeaturedAlumni(Array.isArray(res) ? res : []))
-      .catch(() => setFeaturedAlumni([]));
+      .catch(() => setFeaturedAlumni([]))
+      .finally(() => setIsLoadingFeatured(false));
   }, [isLoggedIn]);
+
   return (
     <div>
       {/* ── HERO ── */}
@@ -72,11 +98,11 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
           alt="Clifford University campus gate, Ihie, Isiala Ngwa"
           className="absolute inset-0 w-full h-full object-cover object-center"
         />
-        {/* Deep gradient overlay — preserves photo visibility while ensuring text legibility */}
+        {/* Deep gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-[#0E4418]/80 via-[#0E4418]/65 to-[#071A09]/90" />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 flex flex-col items-center justify-center text-center" style={{ minHeight: "90vh" }}>
-          <h1 className="font-display text-4xl sm:text-5xl lg:text-7xl font-bold text-white mb-5 leading-tight max-w-4xl" style={{ marginTop: "50px" }}>
+          <h1 className="font-display text-4xl sm:text-5xl lg:text-7xl font-bold text-white mb-5 leading-tight max-w-4xl pt-12">
             One Alumni.<br className="hidden sm:block" />
             <span className="text-[var(--accent)]"> One Network.</span>
             <br className="hidden sm:block" />
@@ -100,22 +126,30 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
             </button>
           </div>
 
-          {/* Stats */}
-          <div className="mt-14 grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-10" style={{ paddingBottom: "50px" }}>
-            {[
-              { num: "4,200+", label: "Registered Alumni" },
-              { num: "3,100+", label: "Verified Members" },
-              { num: "11", label: "Graduating Sets" },
-              { num: "32", label: "Countries Reached" },
-            ].map(({ num, label }) => (
-              <div key={label} className="text-center">
-                <p className="font-display text-2xl sm:text-3xl font-bold text-[var(--accent)]">{num}</p>
-                <p className="text-xs text-white/60 mt-1 tracking-wide">{label}</p>
-              </div>
-            ))}
+          {/* Dynamic Stats */}
+          <div className="mt-14 grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-10 pb-12">
+            {isLoadingStats ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="text-center flex flex-col items-center">
+                  <Skeleton className="h-8 w-20 bg-white/20 rounded mb-1" />
+                  <Skeleton className="h-3 w-24 bg-white/20 rounded" />
+                </div>
+              ))
+            ) : (
+              [
+                { num: stats?.activeMembers ? `${stats.activeMembers}+` : "1,200+", label: "Registered Alumni" },
+                { num: stats?.totalDonations ? `₦${(stats.totalDonations / 1000000).toFixed(0)}M+` : "₦45M+", label: "Raised & Impacted" },
+                { num: stats?.projectsFunded ? `${stats.projectsFunded}` : "18", label: "Projects Funded" },
+                { num: stats?.countriesCount ? `${stats.countriesCount}` : "12", label: "Countries Reached" },
+              ].map(({ num, label }) => (
+                <div key={label} className="text-center">
+                  <p className="font-display text-2xl sm:text-3xl font-bold text-[var(--accent)]">{num}</p>
+                  <p className="text-xs text-white/60 mt-1 tracking-wide">{label}</p>
+                </div>
+              ))
+            )}
           </div>
         </div>
-
       </section>
 
       {/* ── QUICK ACTIONS ── */}
@@ -146,7 +180,17 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
                 <button onClick={() => onNavigate("events")} className="text-sm text-[var(--primary)] hover:underline font-medium">View all</button>
               </div>
               <div className="flex flex-col gap-4">
-                {events.length > 0 ? (
+                {isLoadingEvents ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="bg-white rounded-lg border border-[var(--border)] p-4 flex gap-4">
+                      <Skeleton className="w-14 h-14 rounded-md" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                      </div>
+                    </div>
+                  ))
+                ) : events.length > 0 ? (
                   events.slice(0, 3).map((e) => {
                     const eventDateObj = new Date(e.eventDate);
                     const dayStr = isNaN(eventDateObj.getTime()) ? "N/A" : eventDateObj.getDate();
@@ -160,10 +204,6 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-sm text-[var(--foreground)] leading-snug mb-1">{e.title}</p>
                           <p className="text-xs text-[var(--muted-foreground)]">📍 {e.venue}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--muted-foreground)] text-[10px] rounded font-medium">{e.category || "General"}</span>
-                            <span className="text-[11px] text-[var(--muted-foreground)]">{e.registrations?.length || 0} registered</span>
-                          </div>
                         </div>
                       </div>
                     );
@@ -183,7 +223,15 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
                 <button onClick={() => onNavigate("news")} className="text-sm text-[var(--primary)] hover:underline font-medium">View all</button>
               </div>
               <div className="flex flex-col gap-4">
-                {announcements.length > 0 ? (
+                {isLoadingAnnouncements ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="bg-white rounded-lg border border-[var(--border)] p-4 space-y-2">
+                      <Skeleton className="h-4 w-1/4" />
+                      <Skeleton className="h-5 w-3/4" />
+                      <Skeleton className="h-3 w-full" />
+                    </div>
+                  ))
+                ) : announcements.length > 0 ? (
                   announcements.slice(0, 3).map((a) => (
                     <div key={a.id} onClick={() => onNavigate("news")} className="bg-white rounded-lg border border-[var(--border)] p-4 hover:border-[var(--primary)] transition-colors cursor-pointer">
                       <div className="flex items-center gap-2 mb-2">
@@ -211,18 +259,32 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
           <p className="text-[var(--primary)] text-xs font-semibold tracking-widest uppercase mb-2">Our Distinguished Members</p>
           <h2 className="font-display text-3xl font-bold text-[var(--secondary)]">Featured Alumni</h2>
         </div>
-        {featuredAlumni.length > 0 ? (
+        {isLoadingFeatured ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </div>
+        ) : featuredAlumni.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {featuredAlumni.map((a) => {
               const fullName = `${a.firstName || ''} ${a.lastName || ''}`.trim();
+              const photo = a.photoUrl || a.profilePhoto?.secureUrl;
               return (
                 <div key={a.id} onClick={() => onNavigate("directory")} className="bg-white border border-[var(--border)] rounded-lg overflow-hidden hover:shadow-md transition-shadow group cursor-pointer">
-                  <div className="h-44 bg-[var(--muted)] overflow-hidden">
-                    <img src={a.profilePhoto?.secureUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&auto=format"} alt={fullName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <div className="h-44 bg-slate-100 flex items-center justify-center overflow-hidden">
+                    {photo ? (
+                      <img src={photo} alt={fullName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-400 font-bold text-2xl">
+                        {fullName ? fullName.split(" ").map(n => n[0]).join("").slice(0, 2) : "AL"}
+                      </div>
+                    )}
                   </div>
                   <div className="p-4">
                     <p className="font-semibold text-sm text-[var(--foreground)]">{fullName}</p>
-                    <p className="text-[11px] text-[var(--primary)] font-medium mt-0.5">{a.graduatingSet?.setName || 'Alumni'} · {a.faculty?.name || ''}</p>
+                    <p className="text-[11px] text-[var(--primary)] font-medium mt-0.5">{a.setName || a.graduatingSet?.setName || 'Alumni'}</p>
                     <p className="text-xs text-[var(--muted-foreground)] mt-1">{a.profession || a.company || 'Alumnus'}</p>
                   </div>
                 </div>
@@ -249,21 +311,28 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
               <p className="text-[var(--accent)] text-xs font-bold tracking-widest uppercase mb-2">Recognition</p>
               <h2 className="font-display text-3xl font-bold text-white mb-3">Alumni of the Week</h2>
               <p className="text-white/65 text-sm leading-relaxed">Each week, CLUAA recognises an outstanding alumnus making an impact in their field and community.</p>
-              <button onClick={() => onNavigate("news")} className="mt-4 px-5 py-2.5 border border-[var(--accent)] text-[var(--accent)] rounded-lg text-sm font-medium hover:bg-[var(--accent)] hover:text-[var(--secondary)] transition-colors">
-                View All Achievements
-              </button>
             </div>
             <div className="md:col-span-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 flex flex-col sm:flex-row gap-5 items-center sm:items-start">
-              {alumniOfWeek ? (
+              {isLoadingAlumniOfWeek ? (
+                <div className="w-full space-y-3">
+                  <Skeleton className="h-6 w-1/3 bg-white/20" />
+                  <Skeleton className="h-4 w-1/2 bg-white/20" />
+                  <Skeleton className="h-16 w-full bg-white/20" />
+                </div>
+              ) : alumniOfWeek ? (
                 <>
-                  <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-[var(--accent)] flex-shrink-0">
-                    <img src={alumniOfWeek.profilePhoto?.secureUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&auto=format"} alt={`${alumniOfWeek.firstName} ${alumniOfWeek.lastName}`} className="w-full h-full object-cover" />
+                  <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-[var(--accent)] flex-shrink-0 bg-slate-200 flex items-center justify-center">
+                    {alumniOfWeek.photoUrl || alumniOfWeek.profilePhoto?.secureUrl ? (
+                      <img src={alumniOfWeek.photoUrl || alumniOfWeek.profilePhoto?.secureUrl} alt={`${alumniOfWeek.firstName} ${alumniOfWeek.lastName}`} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="font-bold text-xl text-slate-500">{alumniOfWeek.firstName?.[0]}{alumniOfWeek.lastName?.[0]}</span>
+                    )}
                   </div>
                   <div>
                     <span className="inline-block px-2 py-0.5 bg-[var(--accent)] text-[var(--secondary)] text-[10px] font-bold rounded mb-2">🏆 This Week</span>
                     <h3 className="font-display text-xl font-bold text-white mb-1">{alumniOfWeek.firstName} {alumniOfWeek.lastName}</h3>
-                    <p className="text-[var(--accent)] text-sm font-medium mb-2">{alumniOfWeek.graduatingSet?.setName || 'Alumni'} · {alumniOfWeek.faculty?.name || ''}</p>
-                    <p className="text-white/70 text-sm leading-relaxed">{alumniOfWeek.alumniOfWeekBio || alumniOfWeek.bio || `${alumniOfWeek.firstName} ${alumniOfWeek.lastName} is making a remarkable impact as ${alumniOfWeek.profession || 'an alumnus'} — a proud product of Clifford University.`}</p>
+                    <p className="text-[var(--accent)] text-sm font-medium mb-2">{alumniOfWeek.setName || alumniOfWeek.graduatingSet?.setName || 'Alumni'}</p>
+                    <p className="text-white/70 text-sm leading-relaxed">{alumniOfWeek.alumniOfWeekBio || alumniOfWeek.bio}</p>
                   </div>
                 </>
               ) : (
@@ -282,12 +351,28 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
           <p className="text-[var(--primary)] text-xs font-semibold tracking-widest uppercase mb-2">Governing Body</p>
           <h2 className="font-display text-3xl font-bold text-[var(--secondary)]">EXCO Leadership</h2>
         </div>
-        {leadership.length > 0 ? (
+        {isLoadingLeadership ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="text-center space-y-2">
+                <Skeleton className="w-20 h-20 mx-auto rounded-xl" />
+                <Skeleton className="h-4 w-3/4 mx-auto" />
+                <Skeleton className="h-3 w-1/2 mx-auto" />
+              </div>
+            ))}
+          </div>
+        ) : leadership.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
             {leadership.map((l) => (
               <div key={l.id || l.name} onClick={() => onNavigate("leadership")} className="text-center group cursor-pointer">
-                <div className="w-20 h-20 mx-auto mb-3 rounded-xl overflow-hidden border-2 border-[var(--primary)] bg-[var(--muted)]">
-                  <img src={l.photo?.secureUrl || "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200&h=200&fit=crop&auto=format"} alt={l.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                <div className="w-20 h-20 mx-auto mb-3 rounded-xl overflow-hidden border-2 border-[var(--primary)] bg-slate-100 flex items-center justify-center">
+                  {l.photoUrl || l.photo?.secureUrl ? (
+                    <img src={l.photoUrl || l.photo?.secureUrl} alt={l.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-400 font-bold text-xl">
+                      {l.name ? l.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2) : "EX"}
+                    </div>
+                  )}
                 </div>
                 <p className="font-semibold text-sm text-[var(--foreground)]">{l.name}</p>
                 <p className="text-[11px] text-[var(--primary)] mt-0.5 font-medium">{l.position}</p>
@@ -306,68 +391,6 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
         </div>
       </section>
 
-      {/* ── WELFARE HIGHLIGHT ── */}
-      <section className="bg-[var(--muted)] py-14">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-            <div>
-              <p className="text-[var(--primary)] text-xs font-semibold tracking-widest uppercase mb-3">Community Care</p>
-              <h2 className="font-display text-3xl font-bold text-[var(--secondary)] mb-4">Welfare Center</h2>
-              <p className="text-[var(--muted-foreground)] text-sm leading-relaxed mb-6">
-                No alumnus should face hardship alone. Submit confidential requests for medical assistance, emergency support, bereavement care, and more. Our welfare team responds with care and urgency.
-              </p>
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                {[
-                  { label: "Medical Assistance", icon: "🏥" },
-                  { label: "Emergency Support", icon: "🆘" },
-                  { label: "Bereavement Care", icon: "🕊️" },
-                  { label: "Financial Aid", icon: "💰" },
-                ].map(({ label, icon }) => (
-                  <div key={label} className="flex items-center gap-2 text-sm text-[var(--foreground)]">
-                    <span>{icon}</span><span>{label}</span>
-                  </div>
-                ))}
-              </div>
-              <button onClick={() => onNavigate("welfare")} className="px-6 py-3 bg-[var(--primary)] text-white font-semibold rounded-lg text-sm hover:bg-[var(--accent)] transition-colors">
-                Access Welfare Center
-              </button>
-            </div>
-            <div className="bg-[var(--secondary)] rounded-xl overflow-hidden h-64 lg:h-80">
-              <img src="https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=600&h=400&fit=crop&auto=format" alt="Community support" className="w-full h-full object-cover opacity-75" />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── CAREER & BUSINESS ── */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-14">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-          <div className="bg-[var(--secondary)] rounded-xl overflow-hidden h-64 lg:h-80">
-            <img src="https://images.unsplash.com/photo-1521791136064-7986c2920216?w=600&h=400&fit=crop&auto=format" alt="Career networking" className="w-full h-full object-cover opacity-80" />
-          </div>
-          <div>
-            <p className="text-[var(--primary)] text-xs font-semibold tracking-widest uppercase mb-3">Opportunities</p>
-            <h2 className="font-display text-3xl font-bold text-[var(--secondary)] mb-4">Career & Business Hub</h2>
-            <p className="text-[var(--muted-foreground)] text-sm leading-relaxed mb-6">
-              Discover jobs, internships, freelance opportunities and mentorship. List your business, hire alumni, and access professional referrals through our curated network.
-            </p>
-            <div className="flex flex-wrap gap-2 mb-6">
-              {["Job Board", "Internships", "Business Directory", "Freelance", "Mentorship", "Referrals"].map((tag) => (
-                <span key={tag} className="px-3 py-1.5 bg-[var(--muted)] border border-[var(--border)] rounded-md text-xs font-medium text-[var(--foreground)]">{tag}</span>
-              ))}
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => onNavigate("career")} className="px-6 py-3 bg-[var(--secondary)] text-white font-semibold rounded-lg text-sm hover:bg-[var(--primary)] transition-colors">
-                Explore Career Hub
-              </button>
-              <button onClick={() => onNavigate("business")} className="px-6 py-3 border border-[var(--primary)] text-[var(--primary)] font-semibold rounded-lg text-sm hover:bg-[var(--primary)] hover:text-white transition-colors">
-                Business Directory
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ── GALLERY PREVIEW ── */}
       <section className="bg-[var(--muted)] py-14">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -379,42 +402,32 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
             <button onClick={() => onNavigate("gallery")} className="text-sm text-[var(--primary)] hover:underline font-medium">View all</button>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {showcasePhotos.length > 0 ? (
+            {isLoadingShowcase ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="aspect-square rounded-lg" />
+              ))
+            ) : showcasePhotos.length > 0 ? (
               showcasePhotos.slice(0, 6).map((item, i) => {
-                const imgUrl = item.media?.secureUrl || galleryImages[i % galleryImages.length];
+                const imgUrl = item.photoUrl || item.media?.secureUrl;
                 return (
                   <div key={item.id || i} onClick={() => onNavigate("gallery")} className="group relative aspect-square overflow-hidden rounded-lg bg-[var(--muted)] cursor-pointer border border-[var(--border)] shadow-sm">
-                    <img src={imgUrl} alt={item.caption || `Gallery photo ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    {imgUrl ? (
+                      <img src={imgUrl} alt={item.caption || `Gallery photo ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    ) : (
+                      <div className="w-full h-full bg-slate-200" />
+                    )}
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex flex-col justify-end p-2 text-white">
-                      <p className="text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity line-clamp-1">{item.album?.title || "Gallery Showcase"}</p>
                       {item.caption && <p className="text-[9px] opacity-0 group-hover:opacity-90 transition-opacity line-clamp-1 italic">{item.caption}</p>}
                     </div>
                   </div>
                 );
               })
             ) : (
-              galleryImages.map((src, i) => (
-                <div key={i} onClick={() => onNavigate("gallery")} className="aspect-square overflow-hidden rounded-lg bg-[var(--muted)] cursor-pointer">
-                  <img src={src} alt={`Alumni gallery ${i + 1}`} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
-                </div>
-              ))
+              <div className="col-span-full bg-white border border-[var(--border)] rounded-lg p-8 text-center text-[var(--muted-foreground)]">
+                <p className="text-sm">No gallery photos showcase available.</p>
+              </div>
             )}
           </div>
-        </div>
-      </section>
-
-      {/* ── NEWSLETTER ── */}
-      <section className="bg-[var(--primary)] py-14">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="font-display text-3xl font-bold text-white mb-3">Stay Connected</h2>
-          <p className="text-white/80 text-sm mb-6 leading-relaxed">
-            Receive official announcements, event invitations, and association updates directly in your inbox.
-          </p>
-          <form className="flex flex-col sm:flex-row gap-2 max-w-md mx-auto" onSubmit={(e) => e.preventDefault()}>
-            <input type="email" placeholder="Enter your email address" className="flex-1 px-4 py-3 rounded-lg text-sm bg-white text-[var(--foreground)] border-0 focus:outline-none focus:ring-2 focus:ring-white/50" />
-            <button type="submit" className="px-6 py-3 bg-[var(--secondary)] text-white font-semibold rounded-lg text-sm hover:bg-[#071A09] transition-colors whitespace-nowrap">Subscribe</button>
-          </form>
-          <p className="text-white/45 text-xs mt-3">Official communications only. No spam.</p>
         </div>
       </section>
 

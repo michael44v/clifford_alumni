@@ -75,6 +75,8 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
 
   // Dynamic lists from backend
   const [managedDepartments, setManagedDepartments] = useState<any[]>([]);
+  const [fetchedSets, setFetchedSets] = useState<any[]>([]);
+  const [isLoadingSets, setIsLoadingSets] = useState(true);
 
   useEffect(() => {
     apiFetch("/api/admin/departments")
@@ -82,12 +84,22 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
         if (Array.isArray(res)) setManagedDepartments(res);
       })
       .catch(() => {});
+
+    setIsLoadingSets(true);
+    apiFetch("/api/admin/sets")
+      .then(res => {
+        if (Array.isArray(res)) setFetchedSets(res);
+      })
+      .catch(() => {})
+      .finally(() => setIsLoadingSets(false));
   }, []);
 
   // Login
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [showAdminHint, setShowAdminHint] = useState(false);
+  const [isSubmittingLogin, setIsSubmittingLogin] = useState(false);
+  const [isSubmittingRegister, setIsSubmittingRegister] = useState(false);
 
   // Registration flow
   const [regStep, setRegStep] = useState<RegStep>("type");
@@ -105,6 +117,7 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmittingLogin(true);
     try {
       const res = await apiFetch("/api/auth/login", {
         method: "POST",
@@ -118,6 +131,8 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
       onLogin(isAdmin);
     } catch (err: any) {
       showToast(err.message || "Invalid credentials", "error");
+    } finally {
+      setIsSubmittingLogin(false);
     }
   };
 
@@ -161,6 +176,7 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
     const firstName = nameParts[0] || "Member";
     const lastName = nameParts.slice(1).join(" ") || "Alumni";
 
+    setIsSubmittingRegister(true);
     try {
       const endpoint = memberType === "alumni" ? "/api/auth/register/alumni" : "/api/auth/register/associate";
       const payload = memberType === "alumni"
@@ -199,6 +215,8 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
       onLogin(false);
     } catch (err: any) {
       showToast(err.message || "Registration failed", "error");
+    } finally {
+      setIsSubmittingRegister(false);
     }
   };
 
@@ -250,8 +268,19 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
                   </label>
                   <button type="button" className="text-[var(--primary)] hover:underline">Forgot password?</button>
                 </div>
-                <button type="submit" className="w-full py-3 bg-[var(--primary)] text-white font-semibold rounded-lg text-sm hover:bg-[var(--accent)] transition-colors">
-                  Sign In
+                <button
+                  type="submit"
+                  disabled={isSubmittingLogin}
+                  className="w-full py-3 bg-[var(--primary)] text-white font-semibold rounded-lg text-sm hover:bg-[var(--accent)] transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                >
+                  {isSubmittingLogin ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Signing in...</span>
+                    </>
+                  ) : (
+                    "Sign In"
+                  )}
                 </button>
               </form>
               <div className="mt-4 text-center">
@@ -399,12 +428,24 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
                         <div className="grid grid-cols-2 gap-3">
                           <div>
                             <label className="block text-xs font-medium text-[var(--foreground)] mb-1">Graduating Set *</label>
-                            <select required value={regForm.gradSet} onChange={e => setRegForm({...regForm, gradSet: e.target.value})} className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
-                              <option value="">Select set</option>
-                              {GRADUATION_SETS.map(s => (
-                                <option key={s.set} value={s.set}>{s.set} ({s.year})</option>
-                              ))}
-                            </select>
+                            {isLoadingSets ? (
+                              <div className="h-10 w-full animate-pulse bg-slate-100 rounded-lg border border-[var(--border)]" />
+                            ) : (
+                              <select required value={regForm.gradSet} onChange={e => setRegForm({...regForm, gradSet: e.target.value})} className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
+                                <option value="">Select graduating set</option>
+                                {fetchedSets.length > 0 ? (
+                                  fetchedSets.map(s => (
+                                    <option key={s.id || s.setName} value={s.setName}>
+                                      {s.setName} ({s.graduationYear})
+                                    </option>
+                                  ))
+                                ) : (
+                                  GRADUATION_SETS.map(s => (
+                                    <option key={s.set} value={s.set}>{s.set} ({s.year})</option>
+                                  ))
+                                )}
+                              </select>
+                            )}
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-[var(--foreground)] mb-1">Faculty *</label>
@@ -513,14 +554,21 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
                       {memberType === "alumni" && <p>Set: <strong>{regForm.gradSet || "—"}</strong></p>}
                     </div>
 
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
-                      After registration, your account will be reviewed by the CLUAA administrator. Verification typically takes 2–5 business days.
-                    </div>
-
                     <div className="flex gap-2">
                       <button type="button" onClick={() => setRegStep("details")} className="px-4 py-2.5 border border-[var(--border)] rounded-lg text-sm font-medium hover:border-[var(--primary)] transition-colors">← Back</button>
-                      <button type="submit" disabled={!regForm.password || regForm.password !== regForm.confirm} className="flex-1 py-2.5 bg-[var(--primary)] text-white font-semibold rounded-lg text-sm hover:bg-[var(--accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                        Create Account
+                      <button
+                        type="submit"
+                        disabled={isSubmittingRegister || !regForm.password || regForm.password !== regForm.confirm}
+                        className="flex-1 py-2.5 bg-[var(--primary)] text-white font-semibold rounded-lg text-sm hover:bg-[var(--accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {isSubmittingRegister ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Creating Account...</span>
+                          </>
+                        ) : (
+                          "Create Account"
+                        )}
                       </button>
                     </div>
                   </form>
