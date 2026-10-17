@@ -106,7 +106,7 @@ export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filtered.map((alum) => {
               const fullName = `${alum.firstName || ''} ${alum.lastName || ''}`.trim() || 'Alumnus';
-              const imgUrl = alum.profilePhoto?.secureUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&auto=format";
+              const imgUrl = alum.photoUrl || alum.profilePhoto?.secureUrl || "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg";
               const setName = alum.graduatingSet?.setName || "Alumni";
               const setYear = alum.graduatingSet?.graduationYear || alum.graduatingSet?.year || "";
               const facName = alum.faculty?.name || "";
@@ -148,7 +148,7 @@ export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelectedAlum(null)}>
           <div className="bg-white rounded-xl max-w-md w-full overflow-hidden shadow-xl" onClick={e => e.stopPropagation()}>
             <div className="h-48 bg-[var(--muted)] overflow-hidden relative">
-              <img src={selectedAlum.profilePhoto?.secureUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&auto=format"} alt={`${selectedAlum.firstName} ${selectedAlum.lastName}`} className="w-full h-full object-cover" />
+              <img src={selectedAlum.photoUrl || selectedAlum.profilePhoto?.secureUrl || "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg"} alt={`${selectedAlum.firstName} ${selectedAlum.lastName}`} className="w-full h-full object-cover" />
               <button onClick={() => setSelectedAlum(null)} className="absolute top-3 right-3 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center text-sm hover:bg-black/70">✕</button>
             </div>
             <div className="p-6">

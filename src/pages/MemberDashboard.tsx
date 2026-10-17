@@ -75,7 +75,7 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
   const memberName = me ? `${me.firstName || ''} ${me.lastName || ''}`.trim() : "Member";
   const setName = me?.graduatingSet?.setName || "Alumni";
   const facName = me?.faculty?.name || "";
-  const profilePhoto = me?.profilePhoto?.secureUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop&auto=format";
+  const profilePhoto = me?.profilePhotoUrl || me?.profilePhoto?.secureUrl || "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg";
   const status = me?.verificationStatus || "VERIFIED";
 
   // Calculate profile completion percentage

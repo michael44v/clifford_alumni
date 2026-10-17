@@ -2,13 +2,25 @@
 // backend/utils/response.php
 
 function jsonResponse(mixed $data, int $statusCode = 200): void {
+    global $startTime, $method, $endpoint;
+    if (isset($startTime, $method, $endpoint) && function_exists('logApiRequest')) {
+        $execTime = (microtime(true) - $startTime) * 1000;
+        logApiRequest($method, $endpoint, $statusCode, $execTime);
+    }
     http_response_code($statusCode);
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     exit();
 }
 
 function jsonError(string $message, int $statusCode = 400): void {
+    global $startTime, $method, $endpoint;
+    if (isset($startTime, $method, $endpoint) && function_exists('logApiRequest')) {
+        $execTime = (microtime(true) - $startTime) * 1000;
+        logApiRequest($method, $endpoint, $statusCode, $execTime, $message);
+    }
     http_response_code($statusCode);
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['error' => $message], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     exit();
 }
