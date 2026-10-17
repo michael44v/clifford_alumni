@@ -8,8 +8,8 @@ require_once __DIR__ . '/../middleware/auth.php';
 function handleWelfareRoutes(string $endpoint, string $method): void {
     $user = authenticateJWT();
 
-    if ($method === 'GET' && ($endpoint === '/api/welfare/requests' || $endpoint === '/api/welfare/admin/cases')) {
-        if ($user['role'] === 'ADMIN' || $user['role'] === 'SUPER_ADMIN' || $user['role'] === 'WELFARE_ADMIN') {
+    if ($method === 'GET' && ($endpoint === '/api/welfare' || $endpoint === '/api/welfare/requests' || $endpoint === '/api/welfare/my-requests' || $endpoint === '/api/welfare/admin/cases')) {
+        if (($endpoint === '/api/welfare/requests' || $endpoint === '/api/welfare/admin/cases') && in_array($user['role'], ['ADMIN', 'SUPER_ADMIN', 'WELFARE_ADMIN'])) {
             jsonResponse(dbQuery("SELECT w.*, m.firstName, m.lastName, m.email, m.phone
                                   FROM welfare_requests w
                                   JOIN members m ON w.memberId = m.id
@@ -19,7 +19,7 @@ function handleWelfareRoutes(string $endpoint, string $method): void {
         }
     }
 
-    if ($method === 'POST' && $endpoint === '/api/welfare/requests') {
+    if ($method === 'POST' && ($endpoint === '/api/welfare' || $endpoint === '/api/welfare/requests')) {
         $body = getRequestBody();
         $category = trim($body['category'] ?? 'OTHER');
         $urgency = trim($body['urgency'] ?? 'MEDIUM');

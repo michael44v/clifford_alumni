@@ -12,6 +12,7 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
   const [history, setHistory] = useState<any[]>([]);
   const [myWelfare, setMyWelfare] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
     firstName: "",
     lastName: "",
@@ -60,6 +61,7 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSavingProfile(true);
     try {
       const updated = await apiFetch("/api/members/me", {
         method: "PUT",
@@ -69,6 +71,8 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
       showToast("Profile updated successfully!", "success");
     } catch (err: any) {
       showToast(err.message || "Failed to update profile", "error");
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -245,7 +249,20 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
                   <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Short Biography</label>
                   <textarea rows={3} value={profileForm.bio} onChange={e => setProfileForm({...profileForm, bio: e.target.value})} className="w-full px-3 py-2 border border-[var(--border)] rounded text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" />
                 </div>
-                <button type="submit" className="px-6 py-2.5 bg-[var(--primary)] text-white rounded text-sm font-semibold hover:bg-[var(--accent)] transition-colors">Save Changes</button>
+                <button
+                  type="submit"
+                  disabled={savingProfile}
+                  className="px-6 py-2.5 bg-[var(--primary)] text-white rounded text-sm font-semibold hover:bg-[var(--accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {savingProfile ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </button>
               </form>
             </div>
           </div>

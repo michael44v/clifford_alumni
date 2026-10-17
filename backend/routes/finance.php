@@ -41,6 +41,14 @@ function handleFinanceRoutes(string $endpoint, string $method): void {
     // Protected Finance Routes
     $user = authenticateJWT();
 
+    if ($method === 'GET' && ($endpoint === '/api/finance/history' || $endpoint === '/api/finance/payments')) {
+        jsonResponse(dbQuery("SELECT p.*, d.title as duesTitle, c.title as campaignTitle
+                             FROM payment_records p
+                             LEFT JOIN dues_items d ON p.duesItemId = d.id
+                             LEFT JOIN donation_campaigns c ON p.donationCampaignId = c.id
+                             WHERE p.memberId = ? ORDER BY p.createdAt DESC", [$user['id']]));
+    }
+
     // DUES ADMIN MANAGEMENT
     if ($method === 'POST' && $endpoint === '/api/finance/dues') {
         requireRole($user, ['ADMIN', 'SUPER_ADMIN', 'FINANCE_ADMIN']);
