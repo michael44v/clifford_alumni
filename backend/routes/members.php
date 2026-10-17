@@ -7,22 +7,29 @@ require_once __DIR__ . '/../middleware/auth.php';
 
 function handleMemberRoutes(string $endpoint, string $method): void {
     if ($method === 'GET' && $endpoint === '/api/members/alumni-of-the-week') {
-        $aow = dbQueryOne("SELECT m.*, g.setName, f.name as facultyName, med.secureUrl as photoUrl
-                           FROM members m
-                           LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id
-                           LEFT JOIN faculties f ON m.facultyId = f.id
-                           LEFT JOIN media med ON m.profilePhotoMediaId = med.id
-                           WHERE m.isAlumniOfWeek = 1 LIMIT 1");
+        header('Cache-Control: public, max-age=60, stale-while-revalidate=300');
+        $aow = cacheRemember('members:alumni-of-the-week', 300, function() {
+            return dbQueryOne("SELECT m.*, g.setName, f.name as facultyName, med.secureUrl as photoUrl
+                               FROM members m
+                               LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id
+                               LEFT JOIN faculties f ON m.facultyId = f.id
+                               LEFT JOIN media med ON m.profilePhotoMediaId = med.id
+                               WHERE m.isAlumniOfWeek = 1 LIMIT 1");
+        });
         jsonResponse($aow ?: null);
     }
 
     if ($method === 'GET' && $endpoint === '/api/members/featured') {
-        jsonResponse(dbQuery("SELECT m.id, m.firstName, m.lastName, m.profession, m.company, g.setName, f.name as facultyName, med.secureUrl as photoUrl
-                              FROM members m
-                              LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id
-                              LEFT JOIN faculties f ON m.facultyId = f.id
-                              LEFT JOIN media med ON m.profilePhotoMediaId = med.id
-                              WHERE m.isFeatured = 1 LIMIT 10"));
+        header('Cache-Control: public, max-age=60, stale-while-revalidate=300');
+        $featured = cacheRemember('members:featured', 300, function() {
+            return dbQuery("SELECT m.id, m.firstName, m.lastName, m.profession, m.company, g.setName, f.name as facultyName, med.secureUrl as photoUrl
+                            FROM members m
+                            LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id
+                            LEFT JOIN faculties f ON m.facultyId = f.id
+                            LEFT JOIN media med ON m.profilePhotoMediaId = med.id
+                            WHERE m.isFeatured = 1 LIMIT 10");
+        });
+        jsonResponse($featured);
     }
 
     if ($method === 'GET' && $endpoint === '/api/members/directory') {
