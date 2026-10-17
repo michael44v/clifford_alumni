@@ -165,12 +165,41 @@ function handleAdminRoutes(string $endpoint, string $method): void {
     // MEMBERS ADMIN MANAGEMENT
     if ($method === 'GET' && $endpoint === '/api/admin/members') {
         requireRole($user, ['ADMIN', 'SUPER_ADMIN']);
-        jsonResponse(dbQuery("SELECT m.*, g.setName, f.name as facultyName
-                              FROM members m
-                              LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id
-                              LEFT JOIN faculties f ON m.facultyId = f.id
-                              WHERE m.role NOT IN ('ADMIN', 'SUPER_ADMIN')
-                              ORDER BY m.createdAt DESC"));
+        $facultyId = $_GET['facultyId'] ?? null;
+        $setId = $_GET['setId'] ?? null;
+        $status = $_GET['status'] ?? null;
+        $search = $_GET['search'] ?? null;
+
+        $sql = "SELECT m.*, g.setName, f.name as facultyName
+                FROM members m
+                LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id
+                LEFT JOIN faculties f ON m.facultyId = f.id
+                WHERE m.role NOT IN ('ADMIN', 'SUPER_ADMIN')";
+        $params = [];
+
+        if ($facultyId) {
+            $sql .= " AND m.facultyId = ?";
+            $params[] = $facultyId;
+        }
+
+        if ($setId) {
+            $sql .= " AND m.graduatingSetId = ?";
+            $params[] = $setId;
+        }
+
+        if ($status) {
+            $sql .= " AND m.verificationStatus = ?";
+            $params[] = $status;
+        }
+
+        if ($search) {
+            $sql .= " AND (m.firstName LIKE ? OR m.lastName LIKE ? OR m.email LIKE ? OR m.department LIKE ?)";
+            $st = "%{$search}%";
+            $params = array_merge($params, [$st, $st, $st, $st]);
+        }
+
+        $sql .= " ORDER BY m.createdAt DESC";
+        jsonResponse(dbQuery($sql, $params));
     }
 
     if ($method === 'GET' && preg_match('#^/api/admin/members/([^/]+)/details$#', $endpoint, $m)) {

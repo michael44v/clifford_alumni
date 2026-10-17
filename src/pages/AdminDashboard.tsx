@@ -32,6 +32,8 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   // Search/Filters
   const [memberSearch, setMemberSearch] = useState("");
   const [memberFilterStatus, setMemberFilterStatus] = useState("");
+  const [memberFilterFaculty, setMemberFilterFaculty] = useState("");
+  const [memberFilterSet, setMemberFilterSet] = useState("");
   const [rosterSearch, setRosterSearch] = useState("");
 
   // Replace Photo Modal state
@@ -84,7 +86,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     try {
       const [statsRes, membersRes, rosterRes, mediaRes, welfareRes, paymentsRes, facultiesRes, departmentsRes, setsRes, eventsRes, newsRes, leadershipRes, duesRes, campaignsRes, impactRes, jobsRes] = await Promise.all([
         apiFetch("/api/admin/stats").catch(() => null),
-        apiFetch(`/api/admin/members?search=${encodeURIComponent(memberSearch)}&status=${memberFilterStatus}`).catch(() => []),
+        apiFetch(`/api/admin/members?search=${encodeURIComponent(memberSearch)}&status=${memberFilterStatus}&facultyId=${memberFilterFaculty}&setId=${memberFilterSet}`).catch(() => []),
         apiFetch(`/api/admin/official-directory?search=${encodeURIComponent(rosterSearch)}`).catch(() => []),
         apiFetch("/api/gallery/admin/photos").catch(() => []),
         apiFetch("/api/welfare/admin/cases").catch(() => []),
@@ -129,7 +131,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
 
   useEffect(() => {
     fetchData();
-  }, [memberSearch, memberFilterStatus, rosterSearch]);
+  }, [memberSearch, memberFilterStatus, memberFilterFaculty, memberFilterSet, rosterSearch]);
 
   const handleToggleFeaturedMember = async (m: any) => {
     try {
@@ -811,19 +813,31 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         {activeTab === "members" && (
           <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
             <div className="p-4 border-b border-[var(--border)] flex flex-col sm:flex-row gap-3 items-center justify-between">
-              <div className="flex gap-2 w-full sm:w-auto">
+              <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                 <input
                   type="text"
                   placeholder="Search alumni by name, email, matric..."
                   value={memberSearch}
                   onChange={e => setMemberSearch(e.target.value)}
-                  className="px-3 py-1.5 border border-[var(--border)] rounded text-xs w-full sm:w-64"
+                  className="px-3 py-1.5 border border-[var(--border)] rounded text-xs w-full sm:w-48"
                 />
-                <select value={memberFilterStatus} onChange={e => setMemberFilterStatus(e.target.value)} className="px-3 py-1.5 border border-[var(--border)] rounded text-xs">
+                <select value={memberFilterStatus} onChange={e => setMemberFilterStatus(e.target.value)} className="px-3 py-1.5 border border-[var(--border)] rounded text-xs bg-white">
                   <option value="">All Statuses</option>
                   <option value="VERIFIED">VERIFIED</option>
                   <option value="PENDING">PENDING</option>
                   <option value="SUSPENDED">SUSPENDED</option>
+                </select>
+                <select value={memberFilterFaculty} onChange={e => setMemberFilterFaculty(e.target.value)} className="px-3 py-1.5 border border-[var(--border)] rounded text-xs bg-white">
+                  <option value="">All Faculties</option>
+                  {faculties.map(f => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+                <select value={memberFilterSet} onChange={e => setMemberFilterSet(e.target.value)} className="px-3 py-1.5 border border-[var(--border)] rounded text-xs bg-white">
+                  <option value="">All Graduating Sets</option>
+                  {sets.map(s => (
+                    <option key={s.id} value={s.id}>{s.setName} ({s.graduationYear})</option>
+                  ))}
                 </select>
               </div>
               <p className="text-xs text-[var(--muted-foreground)]">Total: <strong>{members.length}</strong> members (Click row to view full details)</p>
