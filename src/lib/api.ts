@@ -17,7 +17,7 @@ export function getAccessToken(): string | null {
   return accessToken;
 }
 
-const BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+const BASE_URL = ("https://api.vsafetyhub.com/backend").replace(/\/$/, "");
 
 export async function apiFetch<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {});

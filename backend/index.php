@@ -20,6 +20,12 @@ require_once __DIR__ . '/routes/business.php';
 $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $method = $_SERVER['REQUEST_METHOD'];
 
+// Strip the "/backend" prefix (folder the API lives in)
+$base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/'); // "/backend"
+if ($base !== '' && strpos($requestUri, $base) === 0) {
+    $requestUri = substr($requestUri, strlen($base));
+}
+
 // Standardize route path
 $endpoint = rtrim($requestUri, '/');
 if ($endpoint === '') {

@@ -12,16 +12,16 @@ function getDBMode(): string {
     if ($g_mysqli !== null) return 'mysqli';
     if ($g_sqlite_pdo !== null) return 'sqlite';
 
-    $dbHost = getenv('DB_HOST') ?: '127.0.0.1';
-    $dbPort = intval(getenv('DB_PORT') ?: 3306);
-    $dbName = getenv('DB_NAME') ?: 'cuaa_db';
-    $dbUser = getenv('DB_USER') ?: 'root';
-    $dbPass = getenv('DB_PASS') ?: '';
+    $dbHost = getenv('DB_HOST') ?: 'localhost';
+    #$dbPort = intval(getenv('DB_PORT') ?: 3306);
+    $dbName = getenv('DB_NAME') ?: 'vsafaloy_clifford';
+    $dbUser = getenv('DB_USER') ?: 'vsafaloy_root';
+    $dbPass = getenv('DB_PASS') ?: 'victor47009A?';
 
     mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
     try {
-        $g_mysqli = new mysqli($dbHost, $dbUser, $dbPass, $dbName, $dbPort);
+        $g_mysqli = new mysqli($dbHost, $dbUser, $dbPass, $dbName);
         $g_mysqli->set_charset("utf8mb4");
         return 'mysqli';
     } catch (Exception $e) {
