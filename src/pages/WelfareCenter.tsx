@@ -152,8 +152,19 @@ export default function WelfareCenter({ onNavigate, isLoggedIn }: WelfareCenterP
                   <label className="block text-sm font-medium text-[var(--foreground)] mb-1.5">Preferred Contact (optional)</label>
                   <input type="text" value={form.contact} onChange={e => setForm({...form, contact: e.target.value})} placeholder="Phone number or email for follow-up" className="w-full px-3 py-2.5 border border-[var(--border)] rounded text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" />
                 </div>
-                <button type="submit" className="w-full py-3 bg-[var(--primary)] text-white font-semibold rounded text-sm hover:bg-[var(--accent)] transition-colors">
-                  Submit Request Confidentially
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 bg-[var(--primary)] text-white font-semibold rounded text-sm hover:bg-[var(--accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      Submitting...
+                    </>
+                  ) : (
+                    "Submit Request Confidentially"
+                  )}
                 </button>
               </form>
             )}

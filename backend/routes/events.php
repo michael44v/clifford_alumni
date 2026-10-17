@@ -7,17 +7,27 @@ require_once __DIR__ . '/../middleware/auth.php';
 
 function handleEventRoutes(string $endpoint, string $method): void {
     if ($method === 'GET' && $endpoint === '/api/events') {
-        jsonResponse(dbQuery("SELECT e.*, m.secureUrl as bannerUrl
-                              FROM events e
-                              LEFT JOIN media m ON e.bannerMediaId = m.id
-                              ORDER BY e.eventDate ASC"));
+        header('Cache-Control: public, max-age=60, stale-while-revalidate=300');
+        $qs = $_SERVER['QUERY_STRING'] ?? '';
+        $cacheKey = 'events:list' . ($qs ? ':' . $qs : '');
+        $data = cacheRemember($cacheKey, 300, function() {
+            return dbQuery("SELECT e.*, m.secureUrl as bannerUrl
+                            FROM events e
+                            LEFT JOIN media m ON e.bannerMediaId = m.id
+                            ORDER BY e.eventDate ASC");
+        });
+        jsonResponse($data);
     }
 
     if ($method === 'GET' && preg_match('#^/api/events/([^/]+)$#', $endpoint, $m)) {
-        $event = dbQueryOne("SELECT e.*, m.secureUrl as bannerUrl
-                              FROM events e
-                              LEFT JOIN media m ON e.bannerMediaId = m.id
-                              WHERE e.id = ? OR e.slug = ?", [$m[1], $m[1]]);
+        header('Cache-Control: public, max-age=60, stale-while-revalidate=300');
+        $eventIdOrSlug = $m[1];
+        $event = cacheRemember("events:item:{$eventIdOrSlug}", 300, function() use ($eventIdOrSlug) {
+            return dbQueryOne("SELECT e.*, m.secureUrl as bannerUrl
+                               FROM events e
+                               LEFT JOIN media m ON e.bannerMediaId = m.id
+                               WHERE e.id = ? OR e.slug = ?", [$eventIdOrSlug, $eventIdOrSlug]);
+        });
         if (!$event) jsonError("Event not found", 404);
         jsonResponse($event);
     }
@@ -51,12 +61,16 @@ function handleEventRoutes(string $endpoint, string $method): void {
 
         dbQuery("INSERT INTO events (id, title, slug, description, bannerMediaId, eventDate, time, venue, isVirtual, meetingLink, category, createdById) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [$newId, $title, $slug, $description, $bannerMediaId, $eventDate, $time, $venue, $isVirtual, $meetingLink, $category, $user['id']]);
 
+        cacheForget('events:list');
         jsonResponse(dbQueryOne("SELECT * FROM events WHERE id = ?", [$newId]), 201);
     }
 
     if ($method === 'DELETE' && preg_match('#^/api/events/([^/]+)$#', $endpoint, $m)) {
         requireRole($user, ['ADMIN', 'SUPER_ADMIN', 'CONTENT_ADMIN']);
-        dbQuery("DELETE FROM events WHERE id = ?", [$m[1]]);
+        $id = $m[1];
+        dbQuery("DELETE FROM events WHERE id = ?", [$id]);
+        cacheForget('events:list');
+        cacheForget("events:item:{$id}");
         jsonResponse(['message' => 'Event deleted successfully']);
     }
 

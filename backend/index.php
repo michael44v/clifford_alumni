@@ -5,6 +5,7 @@ require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/utils/response.php';
 require_once __DIR__ . '/utils/logger.php';
+require_once __DIR__ . '/utils/cache.php';
 
 $startTime = microtime(true);
 

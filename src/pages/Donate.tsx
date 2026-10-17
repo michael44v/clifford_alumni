@@ -223,10 +223,19 @@ export default function Donate({ onNavigate, isLoggedIn }: DonateProps) {
 
                 <button
                   type="submit"
-                  disabled={finalAmount < 100 || !currentCause}
-                  className="w-full py-3 bg-[var(--primary)] text-white font-semibold rounded text-sm hover:bg-[var(--accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading || finalAmount < 100 || !currentCause}
+                  className="w-full py-3 bg-[var(--primary)] text-white font-semibold rounded text-sm hover:bg-[var(--accent)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {finalAmount >= 100 ? `Donate ${fmt(finalAmount)} via Korapay` : "Enter an amount to continue"}
+                  {loading ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      Processing...
+                    </>
+                  ) : finalAmount >= 100 ? (
+                    `Donate ${fmt(finalAmount)} via Korapay`
+                  ) : (
+                    "Enter an amount to continue"
+                  )}
                 </button>
               </form>
             )}

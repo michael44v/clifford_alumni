@@ -7,10 +7,14 @@ require_once __DIR__ . '/../middleware/auth.php';
 
 function handleGalleryRoutes(string $endpoint, string $method): void {
     if ($method === 'GET' && $endpoint === '/api/gallery/landing-page') {
-        jsonResponse(dbQuery("SELECT p.*, m.secureUrl as photoUrl
-                              FROM gallery_photos p
-                              JOIN media m ON p.mediaId = m.id
-                              WHERE p.isFeatured = 1 ORDER BY p.createdAt DESC LIMIT 12"));
+        header('Cache-Control: public, max-age=60, stale-while-revalidate=300');
+        $data = cacheRemember('gallery:landing-page', 300, function() {
+            return dbQuery("SELECT p.*, m.secureUrl as photoUrl
+                            FROM gallery_photos p
+                            JOIN media m ON p.mediaId = m.id
+                            WHERE p.isFeatured = 1 ORDER BY p.createdAt DESC LIMIT 12");
+        });
+        jsonResponse($data);
     }
 
     if ($method === 'GET' && $endpoint === '/api/gallery/albums') {
@@ -85,6 +89,7 @@ function handleGalleryRoutes(string $endpoint, string $method): void {
             $createdPhotos[] = ['id' => $photoId, 'photoUrl' => $url, 'caption' => $caption];
         }
 
+        cacheForget('gallery:landing-page');
         jsonResponse(['message' => 'Photos uploaded successfully', 'albumId' => $albumId, 'photos' => $createdPhotos], 201);
     }
 
@@ -94,6 +99,7 @@ function handleGalleryRoutes(string $endpoint, string $method): void {
         $isFeatured = !empty($body['isFeatured']) ? 1 : 0;
 
         dbQuery("UPDATE gallery_photos SET isFeatured = ? WHERE id = ?", [$isFeatured, $m[1]]);
+        cacheForget('gallery:landing-page');
         jsonResponse(['message' => 'Photo featured status updated']);
     }
 
@@ -116,6 +122,7 @@ function handleGalleryRoutes(string $endpoint, string $method): void {
             dbQuery("UPDATE gallery_photos SET caption = ? WHERE id = ?", [$caption, $photoId]);
         }
 
+        cacheForget('gallery:landing-page');
         jsonResponse(['message' => 'Photo updated successfully']);
     }
 
@@ -124,6 +131,7 @@ function handleGalleryRoutes(string $endpoint, string $method): void {
         requireRole($user, ['ADMIN', 'SUPER_ADMIN', 'CONTENT_ADMIN']);
         $photoId = $m[1];
         dbQuery("DELETE FROM gallery_photos WHERE id = ?", [$photoId]);
+        cacheForget('gallery:landing-page');
         jsonResponse(['message' => 'Photo deleted successfully']);
     }
 }

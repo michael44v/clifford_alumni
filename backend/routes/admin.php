@@ -20,7 +20,11 @@ function handleAdminRoutes(string $endpoint, string $method): void {
     }
 
     if ($method === 'GET' && ($endpoint === '/api/admin/leadership' || $endpoint === '/api/members/leadership')) {
-        jsonResponse(dbQuery("SELECT * FROM leadership_profiles ORDER BY orderIndex ASC, termStart DESC"));
+        header('Cache-Control: public, max-age=60, stale-while-revalidate=300');
+        $data = cacheRemember('leadership:list', 300, function() {
+            return dbQuery("SELECT * FROM leadership_profiles ORDER BY orderIndex ASC, termStart DESC");
+        });
+        jsonResponse($data);
     }
 
     // Protected Admin Routes Require Auth
@@ -213,6 +217,7 @@ function handleAdminRoutes(string $endpoint, string $method): void {
         }
 
         dbQuery("UPDATE members SET isAlumniOfWeek = ?, alumniOfWeekBio = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?", [$isAlumniOfWeek, $bio, $m[1]]);
+        cacheForget('members:alumni-of-the-week');
         jsonResponse(['message' => 'Alumni of the week updated successfully']);
     }
 
@@ -222,6 +227,7 @@ function handleAdminRoutes(string $endpoint, string $method): void {
         $isFeatured = !empty($body['isFeatured']) ? 1 : 0;
 
         dbQuery("UPDATE members SET isFeatured = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?", [$isFeatured, $m[1]]);
+        cacheForget('members:featured');
         jsonResponse(['message' => 'Member featured status updated successfully']);
     }
 
@@ -247,6 +253,7 @@ function handleAdminRoutes(string $endpoint, string $method): void {
             dbQuery("UPDATE members SET role = 'EXCO_ADMIN' WHERE id = ?", [$memberId]);
         }
 
+        cacheForget('leadership:list');
         jsonResponse(dbQueryOne("SELECT * FROM leadership_profiles WHERE id = ?", [$newId]), 201);
     }
 
@@ -273,12 +280,14 @@ function handleAdminRoutes(string $endpoint, string $method): void {
 
         dbQuery("UPDATE leadership_profiles SET name = ?, position = ?, biography = ?, photoUrl = ?, termStart = ?, termEnd = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?", [$updName, $updPos, $updBio, $updPhoto ?: null, $updStart, $updEnd, $leadId]);
 
+        cacheForget('leadership:list');
         jsonResponse(dbQueryOne("SELECT * FROM leadership_profiles WHERE id = ?", [$leadId]));
     }
 
     if ($method === 'DELETE' && preg_match('#^/api/admin/leadership/([^/]+)$#', $endpoint, $m)) {
         requireRole($user, ['ADMIN', 'SUPER_ADMIN']);
         dbQuery("DELETE FROM leadership_profiles WHERE id = ?", [$m[1]]);
+        cacheForget('leadership:list');
         jsonResponse(['message' => 'Leadership profile deleted successfully']);
     }
 
@@ -293,6 +302,7 @@ function handleAdminRoutes(string $endpoint, string $method): void {
 
         dbQuery("UPDATE impact_stats SET activeMembers = ?, totalDonations = ?, projectsFunded = ?, countriesCount = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = 'default-impact-stats'", [$activeMembers, $totalDonations, $projectsFunded, $countriesCount]);
 
+        cacheForget('finance:impact-stats');
         jsonResponse(dbQueryOne("SELECT * FROM impact_stats WHERE id = 'default-impact-stats'"));
     }
 }

@@ -7,22 +7,26 @@ require_once __DIR__ . '/../middleware/auth.php';
 
 function handleFinanceRoutes(string $endpoint, string $method): void {
     if ($method === 'GET' && $endpoint === '/api/finance/impact-stats') {
-        $stats = dbQueryOne("SELECT * FROM impact_stats WHERE id = 'default-impact-stats'");
-        if (!$stats) {
-            // Compute dynamic stats from live DB tables
-            $membersCount = dbQueryOne("SELECT COUNT(*) as cnt FROM members WHERE verificationStatus = 'VERIFIED'")['cnt'] ?? 0;
-            $donationsSum = dbQueryOne("SELECT SUM(amount) as total FROM payment_records WHERE status = 'SUCCESSFUL'")['total'] ?? 0;
-            $projectsCount = dbQueryOne("SELECT COUNT(*) as cnt FROM donation_campaigns")['cnt'] ?? 0;
-            $countriesCount = dbQueryOne("SELECT COUNT(DISTINCT diasporaCountry) as cnt FROM members WHERE diasporaCountry IS NOT NULL AND diasporaCountry != ''")['cnt'] ?? 0;
+        header('Cache-Control: public, max-age=60, stale-while-revalidate=300');
+        $stats = cacheRemember('finance:impact-stats', 300, function() {
+            $s = dbQueryOne("SELECT * FROM impact_stats WHERE id = 'default-impact-stats'");
+            if (!$s) {
+                // Compute dynamic stats from live DB tables
+                $membersCount = dbQueryOne("SELECT COUNT(*) as cnt FROM members WHERE verificationStatus = 'VERIFIED'")['cnt'] ?? 0;
+                $donationsSum = dbQueryOne("SELECT SUM(amount) as total FROM payment_records WHERE status = 'SUCCESSFUL'")['total'] ?? 0;
+                $projectsCount = dbQueryOne("SELECT COUNT(*) as cnt FROM donation_campaigns")['cnt'] ?? 0;
+                $countriesCount = dbQueryOne("SELECT COUNT(DISTINCT diasporaCountry) as cnt FROM members WHERE diasporaCountry IS NOT NULL AND diasporaCountry != ''")['cnt'] ?? 0;
 
-            $stats = [
-                'id' => 'default-impact-stats',
-                'activeMembers' => max(intval($membersCount), 1250),
-                'totalDonations' => max(floatval($donationsSum), 45000000),
-                'projectsFunded' => max(intval($projectsCount), 18),
-                'countriesCount' => max(intval($countriesCount), 12)
-            ];
-        }
+                $s = [
+                    'id' => 'default-impact-stats',
+                    'activeMembers' => max(intval($membersCount), 1250),
+                    'totalDonations' => max(floatval($donationsSum), 45000000),
+                    'projectsFunded' => max(intval($projectsCount), 18),
+                    'countriesCount' => max(intval($countriesCount), 12)
+                ];
+            }
+            return $s;
+        });
         jsonResponse($stats);
     }
 
@@ -36,6 +40,14 @@ function handleFinanceRoutes(string $endpoint, string $method): void {
 
     // Protected Finance Routes
     $user = authenticateJWT();
+
+    if ($method === 'GET' && ($endpoint === '/api/finance/history' || $endpoint === '/api/finance/payments')) {
+        jsonResponse(dbQuery("SELECT p.*, d.title as duesTitle, c.title as campaignTitle
+                             FROM payment_records p
+                             LEFT JOIN dues_items d ON p.duesItemId = d.id
+                             LEFT JOIN donation_campaigns c ON p.donationCampaignId = c.id
+                             WHERE p.memberId = ? ORDER BY p.createdAt DESC", [$user['id']]));
+    }
 
     // DUES ADMIN MANAGEMENT
     if ($method === 'POST' && $endpoint === '/api/finance/dues') {
