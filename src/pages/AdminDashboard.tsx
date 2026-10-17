@@ -13,6 +13,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [members, setMembers] = useState<any[]>([]);
   const [roster, setRoster] = useState<any[]>([]);
   const [galleryPhotos, setGalleryPhotos] = useState<any[]>([]);
+  const [galleryAlbums, setGalleryAlbums] = useState<any[]>([]);
   const [welfareCases, setWelfareCases] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [faculties, setFaculties] = useState<any[]>([]);
@@ -84,11 +85,12 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [statsRes, membersRes, rosterRes, mediaRes, welfareRes, paymentsRes, facultiesRes, departmentsRes, setsRes, eventsRes, newsRes, leadershipRes, duesRes, campaignsRes, impactRes, jobsRes] = await Promise.all([
+      const [statsRes, membersRes, rosterRes, mediaRes, albumsRes, welfareRes, paymentsRes, facultiesRes, departmentsRes, setsRes, eventsRes, newsRes, leadershipRes, duesRes, campaignsRes, impactRes, jobsRes] = await Promise.all([
         apiFetch("/api/admin/stats").catch(() => null),
         apiFetch(`/api/admin/members?search=${encodeURIComponent(memberSearch)}&status=${memberFilterStatus}&facultyId=${memberFilterFaculty}&setId=${memberFilterSet}`).catch(() => []),
         apiFetch(`/api/admin/official-directory?search=${encodeURIComponent(rosterSearch)}`).catch(() => []),
         apiFetch("/api/gallery/admin/photos").catch(() => []),
+        apiFetch("/api/gallery/albums").catch(() => []),
         apiFetch("/api/welfare/admin/cases").catch(() => []),
         apiFetch("/api/admin/payments").catch(() => []),
         apiFetch("/api/admin/faculties").catch(() => []),
@@ -107,6 +109,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setMembers(Array.isArray(membersRes) ? membersRes : []);
       setRoster(Array.isArray(rosterRes) ? rosterRes : []);
       setGalleryPhotos(Array.isArray(mediaRes) ? mediaRes : []);
+      setGalleryAlbums(Array.isArray(albumsRes) ? albumsRes : []);
       setWelfareCases(Array.isArray(welfareRes) ? welfareRes : []);
       setPayments(Array.isArray(paymentsRes) ? paymentsRes : []);
       setFaculties(Array.isArray(facultiesRes) ? facultiesRes : []);
@@ -942,7 +945,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
               {galleryPhotos.map((photo) => (
                 <div key={photo.id} className="border border-[var(--border)] rounded-lg overflow-hidden bg-slate-50 flex flex-col hover:shadow-md transition-shadow">
                   <div className="h-44 bg-[var(--muted)] relative overflow-hidden">
-                    <img src={photo.media?.secureUrl} alt={photo.caption || "Showcase photo"} className="w-full h-full object-cover" />
+                    <img src={photo.photoUrl || photo.media?.secureUrl || photo.media?.url} alt={photo.caption || "Showcase photo"} className="w-full h-full object-cover" />
                     {photo.isFeatured && (
                       <span className="absolute top-2 right-2 px-2 py-0.5 bg-amber-500 text-white font-bold text-[10px] rounded shadow uppercase tracking-wide">
                         🌟 Landing Page Featured
@@ -951,13 +954,15 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                   </div>
                   <div className="p-3 text-xs flex-1 flex flex-col justify-between">
                     <div className="space-y-1">
-                      <p className="font-semibold text-[var(--foreground)] line-clamp-1">{photo.album?.title || "Gallery Showcase"}</p>
+                      <p className="font-semibold text-[var(--foreground)] line-clamp-1">{photo.albumTitle || photo.album?.title || "Gallery Showcase"}</p>
                       {photo.caption && <p className="text-[var(--muted-foreground)] italic line-clamp-2">"{photo.caption}"</p>}
                       <div className="pt-2 border-t border-[var(--border)] text-[11px]">
                         <p className="text-[var(--primary)] font-bold">
-                          Uploader: {photo.uploadedBy?.firstName} {photo.uploadedBy?.lastName}
+                          Uploader: {photo.firstName || photo.uploadedBy?.firstName || 'Alumnus'} {photo.lastName || photo.uploadedBy?.lastName || ''}
                         </p>
-                        <p className="text-[var(--muted-foreground)] text-[10px]">{photo.uploadedBy?.email} · {photo.uploadedBy?.matricNumber || 'No Matric'}</p>
+                        {(photo.email || photo.uploadedBy?.email) && (
+                          <p className="text-[var(--muted-foreground)] text-[10px]">{photo.email || photo.uploadedBy?.email}</p>
+                        )}
                         <p className="text-[10px] text-[var(--muted-foreground)]">{new Date(photo.createdAt).toLocaleDateString()}</p>
                       </div>
                     </div>
@@ -1461,11 +1466,9 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                     className="w-full p-2 border border-[var(--border)] rounded bg-white"
                   >
                     <option value="">-- Create New Album --</option>
-                    {Array.from(new Map(galleryPhotos.map(p => [p.album?.id, p.album])).values())
-                      .filter(Boolean)
-                      .map((a: any) => (
-                        <option key={a.id} value={a.id}>{a.title} ({a.category})</option>
-                      ))}
+                    {galleryAlbums.map((a: any) => (
+                      <option key={a.id} value={a.id}>{a.title} ({a.category || "General"})</option>
+                    ))}
                   </select>
                 </div>
                 {!adminSelectedAlbumId && (

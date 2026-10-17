@@ -13,36 +13,55 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
   const [myWelfare, setMyWelfare] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [setsList, setSetsList] = useState<any[]>([]);
+  const [facultiesList, setFacultiesList] = useState<any[]>([]);
+  const [departmentsList, setDepartmentsList] = useState<any[]>([]);
+
   const [profileForm, setProfileForm] = useState({
     firstName: "",
     lastName: "",
+    email: "",
     phone: "",
     profession: "",
     company: "",
     bio: "",
     profilePhotoUrl: "",
+    graduatingSetId: "",
+    facultyId: "",
+    department: "",
   });
 
   const loadMemberData = async () => {
     setLoading(true);
     try {
-      const [meRes, duesRes, histRes, welfareRes] = await Promise.all([
+      const [meRes, duesRes, histRes, welfareRes, setsRes, facsRes, deptsRes] = await Promise.all([
         apiFetch("/api/members/me").catch(() => null),
         apiFetch("/api/finance/dues").catch(() => []),
         apiFetch("/api/finance/history").catch(() => []),
         apiFetch("/api/welfare/my-requests").catch(() => []),
+        apiFetch("/api/admin/sets").catch(() => []),
+        apiFetch("/api/admin/faculties").catch(() => []),
+        apiFetch("/api/admin/departments").catch(() => []),
       ]);
+
+      if (Array.isArray(setsRes)) setSetsList(setsRes);
+      if (Array.isArray(facsRes)) setFacultiesList(facsRes);
+      if (Array.isArray(deptsRes)) setDepartmentsList(deptsRes);
 
       if (meRes) {
         setMe(meRes);
         setProfileForm({
           firstName: meRes.firstName || "",
           lastName: meRes.lastName || "",
+          email: meRes.email || "",
           phone: meRes.phone || "",
           profession: meRes.profession || "",
           company: meRes.company || "",
           bio: meRes.bio || "",
-          profilePhotoUrl: meRes.profilePhoto?.secureUrl || "",
+          profilePhotoUrl: meRes.profilePhotoUrl || meRes.profilePhoto?.secureUrl || "",
+          graduatingSetId: meRes.graduatingSetId || "",
+          facultyId: meRes.facultyId || "",
+          department: meRes.department || "",
         });
       }
       setDues(Array.isArray(duesRes) ? duesRes : duesRes.data || []);
@@ -225,17 +244,50 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">First Name</label>
-                    <input type="text" value={profileForm.firstName} onChange={e => setProfileForm({...profileForm, firstName: e.target.value})} className="w-full px-3 py-2 border border-[var(--border)] rounded text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" />
+                    <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">First Name (Read-only)</label>
+                    <input type="text" disabled value={profileForm.firstName} className="w-full px-3 py-2 border border-[var(--border)] bg-slate-100 rounded text-sm cursor-not-allowed text-slate-500" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Last Name</label>
-                    <input type="text" value={profileForm.lastName} onChange={e => setProfileForm({...profileForm, lastName: e.target.value})} className="w-full px-3 py-2 border border-[var(--border)] rounded text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" />
+                    <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Last Name (Read-only)</label>
+                    <input type="text" disabled value={profileForm.lastName} className="w-full px-3 py-2 border border-[var(--border)] bg-slate-100 rounded text-sm cursor-not-allowed text-slate-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Email Address (Read-only)</label>
+                    <input type="email" disabled value={profileForm.email} className="w-full px-3 py-2 border border-[var(--border)] bg-slate-100 rounded text-sm cursor-not-allowed text-slate-500" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Phone Number</label>
                     <input type="tel" value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} className="w-full px-3 py-2 border border-[var(--border)] rounded text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" />
                   </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Graduating Set</label>
+                    <select value={profileForm.graduatingSetId} onChange={e => setProfileForm({...profileForm, graduatingSetId: e.target.value})} className="w-full px-3 py-2 border border-[var(--border)] rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
+                      <option value="">Select Graduating Set</option>
+                      {setsList.map(s => (
+                        <option key={s.id} value={s.id}>{s.setName} ({s.graduationYear})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Faculty</label>
+                    <select value={profileForm.facultyId} onChange={e => setProfileForm({...profileForm, facultyId: e.target.value})} className="w-full px-3 py-2 border border-[var(--border)] rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
+                      <option value="">Select Faculty</option>
+                      {facultiesList.map(f => (
+                        <option key={f.id} value={f.id}>{f.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Department / Programme</label>
+                    <select value={profileForm.department} onChange={e => setProfileForm({...profileForm, department: e.target.value})} className="w-full px-3 py-2 border border-[var(--border)] rounded text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
+                      <option value="">Select Department</option>
+                      {departmentsList.map(d => (
+                        <option key={d.id || d.name} value={d.name}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-medium text-[var(--muted-foreground)] mb-1">Profession</label>
                     <input type="text" value={profileForm.profession} onChange={e => setProfileForm({...profileForm, profession: e.target.value})} className="w-full px-3 py-2 border border-[var(--border)] rounded text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring)]" />

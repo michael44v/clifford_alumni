@@ -83,8 +83,6 @@ function handleMemberRoutes(string $endpoint, string $method): void {
 
     if ($method === 'PUT' && ($endpoint === '/api/members/me' || $endpoint === '/api/members/profile')) {
         $body = getRequestBody();
-        $firstName = trim($body['firstName'] ?? '');
-        $lastName = trim($body['lastName'] ?? '');
         $phone = trim($body['phone'] ?? '');
         $profession = trim($body['profession'] ?? '');
         $company = trim($body['company'] ?? '');
@@ -92,9 +90,21 @@ function handleMemberRoutes(string $endpoint, string $method): void {
         $diasporaCountry = trim($body['diasporaCountry'] ?? '');
         $diasporaCity = trim($body['diasporaCity'] ?? '');
         $profilePhotoUrl = trim($body['profilePhotoUrl'] ?? '');
+        $department = trim($body['department'] ?? '');
+        $graduatingSetId = trim($body['gradSet'] ?? $body['graduatingSetId'] ?? '');
+        $facultyId = trim($body['faculty'] ?? $body['facultyId'] ?? '');
+
+        // Resolve graduatingSetId / facultyId if provided as names
+        if ($graduatingSetId && !preg_match('/^[a-f0-9-]{36}$/i', $graduatingSetId)) {
+            $sRow = dbQueryOne("SELECT id FROM graduating_sets WHERE LOWER(setName) = LOWER(?) OR id = ?", [$graduatingSetId, $graduatingSetId]);
+            if ($sRow) $graduatingSetId = $sRow['id'];
+        }
+        if ($facultyId && !preg_match('/^[a-f0-9-]{36}$/i', $facultyId)) {
+            $fRow = dbQueryOne("SELECT id FROM faculties WHERE LOWER(name) = LOWER(?) OR id = ?", [$facultyId, $facultyId]);
+            if ($fRow) $facultyId = $fRow['id'];
+        }
 
         // Handle profile photo media if provided
-        $mediaId = null;
         if (!empty($profilePhotoUrl) && $profilePhotoUrl !== '[File Selected]') {
             $existingMember = dbQueryOne("SELECT profilePhotoMediaId FROM members WHERE id = ?", [$user['id']]);
             if (!empty($existingMember['profilePhotoMediaId'])) {
@@ -108,16 +118,17 @@ function handleMemberRoutes(string $endpoint, string $method): void {
         }
 
         dbQuery("UPDATE members SET
-            firstName = COALESCE(NULLIF(?, ''), firstName),
-            lastName = COALESCE(NULLIF(?, ''), lastName),
             phone = COALESCE(NULLIF(?, ''), phone),
             profession = COALESCE(NULLIF(?, ''), profession),
             company = COALESCE(NULLIF(?, ''), company),
             bio = COALESCE(NULLIF(?, ''), bio),
             diasporaCountry = COALESCE(NULLIF(?, ''), diasporaCountry),
             diasporaCity = COALESCE(NULLIF(?, ''), diasporaCity),
+            department = COALESCE(NULLIF(?, ''), department),
+            graduatingSetId = COALESCE(NULLIF(?, ''), graduatingSetId),
+            facultyId = COALESCE(NULLIF(?, ''), facultyId),
             updatedAt = CURRENT_TIMESTAMP
-            WHERE id = ?", [$firstName, $lastName, $phone, $profession, $company, $bio, $diasporaCountry, $diasporaCity, $user['id']]);
+            WHERE id = ?", [$phone, $profession, $company, $bio, $diasporaCountry, $diasporaCity, $department, $graduatingSetId, $facultyId, $user['id']]);
 
         $upd = dbQueryOne("SELECT m.*, g.setName, f.name as facultyName, med.secureUrl as profilePhotoUrl
                            FROM members m
