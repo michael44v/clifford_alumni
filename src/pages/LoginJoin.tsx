@@ -76,7 +76,9 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
   // Dynamic lists from backend
   const [managedDepartments, setManagedDepartments] = useState<any[]>([]);
   const [fetchedSets, setFetchedSets] = useState<any[]>([]);
+  const [fetchedFaculties, setFetchedFaculties] = useState<any[]>([]);
   const [isLoadingSets, setIsLoadingSets] = useState(true);
+  const [isLoadingFaculties, setIsLoadingFaculties] = useState(true);
 
   useEffect(() => {
     apiFetch("/api/admin/departments")
@@ -92,6 +94,14 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
       })
       .catch(() => {})
       .finally(() => setIsLoadingSets(false));
+
+    setIsLoadingFaculties(true);
+    apiFetch("/api/admin/faculties")
+      .then(res => {
+        if (Array.isArray(res)) setFetchedFaculties(res);
+      })
+      .catch(() => {})
+      .finally(() => setIsLoadingFaculties(false));
   }, []);
 
   // Login
@@ -449,25 +459,36 @@ export default function LoginJoin({ mode, onLogin, onNavigate }: LoginJoinProps)
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-[var(--foreground)] mb-1">Faculty *</label>
-                            <select required value={regForm.faculty} onChange={e => setRegForm({...regForm, faculty: e.target.value, dept: ""})} className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
-                              <option value="">Select faculty</option>
-                              {CLU_FACULTIES.map(f => <option key={f}>{f}</option>)}
-                            </select>
+                            {isLoadingFaculties ? (
+                              <div className="h-10 w-full animate-pulse bg-slate-100 rounded-lg border border-[var(--border)]" />
+                            ) : (
+                              <select required value={regForm.faculty} onChange={e => setRegForm({...regForm, faculty: e.target.value, dept: ""})} className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
+                                <option value="">Select faculty</option>
+                                {fetchedFaculties.length > 0 ? (
+                                  fetchedFaculties.map(f => (
+                                    <option key={f.id || f.name} value={f.name}>{f.name}</option>
+                                  ))
+                                ) : (
+                                  CLU_FACULTIES.map(f => <option key={f}>{f}</option>)
+                                )}
+                              </select>
+                            )}
                           </div>
                         </div>
-                        {regForm.faculty && (
-                          <div>
-                            <label className="block text-xs font-medium text-[var(--foreground)] mb-1">Programme / Department *</label>
-                            <select required value={regForm.dept} onChange={e => setRegForm({...regForm, dept: e.target.value})} className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
-                              <option value="">Select programme</option>
-                              {managedDepartments.length > 0 ? (
-                                managedDepartments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)
-                              ) : (
-                                (CLU_FACULTIES_PROGRAMS[regForm.faculty] ?? []).map(p => <option key={p}>{p}</option>)
-                              )}
-                            </select>
-                          </div>
-                        )}
+                        <div>
+                          <label className="block text-xs font-medium text-[var(--foreground)] mb-1">Department / Programme *</label>
+                          <select required value={regForm.dept} onChange={e => setRegForm({...regForm, dept: e.target.value})} className="w-full px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
+                            <option value="">Select department / programme</option>
+                            {managedDepartments.length > 0 ? (
+                              managedDepartments.map(d => <option key={d.id || d.name} value={d.name}>{d.name}</option>)
+                            ) : (
+                              (CLU_FACULTIES_PROGRAMS[regForm.faculty] || [
+                                "Computer Science", "Accounting", "Business Administration", "Mass Communication",
+                                "Biochemistry", "Microbiology", "Economics", "Law"
+                              ]).map(p => <option key={p} value={p}>{p}</option>)
+                            )}
+                          </select>
+                        </div>
                       </>
                     )}
 

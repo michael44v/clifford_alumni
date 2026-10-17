@@ -9,7 +9,9 @@ function handleWelfareRoutes(string $endpoint, string $method): void {
     $user = authenticateJWT();
 
     if ($method === 'GET' && ($endpoint === '/api/welfare' || $endpoint === '/api/welfare/requests' || $endpoint === '/api/welfare/my-requests' || $endpoint === '/api/welfare/admin/cases')) {
-        if (($endpoint === '/api/welfare/requests' || $endpoint === '/api/welfare/admin/cases') && in_array($user['role'], ['ADMIN', 'SUPER_ADMIN', 'WELFARE_ADMIN'])) {
+        if ($endpoint === '/api/welfare/my-requests') {
+            jsonResponse(dbQuery("SELECT * FROM welfare_requests WHERE memberId = ? ORDER BY createdAt DESC", [$user['id']]));
+        } else if (($endpoint === '/api/welfare/requests' || $endpoint === '/api/welfare/admin/cases') && in_array($user['role'], ['ADMIN', 'SUPER_ADMIN', 'WELFARE_ADMIN'])) {
             jsonResponse(dbQuery("SELECT w.*, m.firstName, m.lastName, m.email, m.phone
                                   FROM welfare_requests w
                                   JOIN members m ON w.memberId = m.id
