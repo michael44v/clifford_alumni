@@ -7,8 +7,8 @@ require_once __DIR__ . '/../middleware/auth.php';
 
 function handleGalleryRoutes(string $endpoint, string $method): void {
     if ($method === 'GET' && $endpoint === '/api/gallery/landing-page') {
-        header('Cache-Control: public, max-age=60, stale-while-revalidate=300');
-        $data = cacheRemember('gallery:landing-page', 300, function() {
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        $data = cacheRemember('gallery:landing-page', 10, function() {
             return dbQuery("SELECT p.*, m.secureUrl as photoUrl
                             FROM gallery_photos p
                             JOIN media m ON p.mediaId = m.id
@@ -57,36 +57,44 @@ function handleGalleryRoutes(string $endpoint, string $method): void {
     if ($method === 'POST' && $endpoint === '/api/gallery/upload-multiple') {
         $body = getRequestBody();
         $photos = $body['photos'] ?? [];
+        $albumIdInput = trim($body['albumId'] ?? '');
         $albumTitle = trim($body['albumTitle'] ?? 'General Gallery');
         $category = trim($body['category'] ?? 'ALUMNI_EVENT');
         $graduatingSetId = trim($body['graduatingSetId'] ?? '');
+        $topIsFeatured = !empty($body['isFeatured']) ? 1 : 0;
 
         if (empty($photos)) jsonError("No photos provided for upload");
 
-        // Find or create album
-        $album = dbQueryOne("SELECT id FROM gallery_albums WHERE title = ?", [$albumTitle]);
+        $albumId = null;
+        if (!empty($albumIdInput)) {
+            $existingAlbum = dbQueryOne("SELECT id FROM gallery_albums WHERE id = ?", [$albumIdInput]);
+            if ($existingAlbum) $albumId = $existingAlbum['id'];
+        }
 
-        if ($album) {
-            $albumId = $album['id'];
-        } else {
-            $albumId = generateUuid();
-            dbQuery("INSERT INTO gallery_albums (id, title, category, graduatingSetId) VALUES (?, ?, ?, ?)", [$albumId, $albumTitle, $category, $graduatingSetId ?: null]);
+        if (!$albumId) {
+            $existingByTitle = dbQueryOne("SELECT id FROM gallery_albums WHERE LOWER(title) = LOWER(?)", [$albumTitle]);
+            if ($existingByTitle) {
+                $albumId = $existingByTitle['id'];
+            } else {
+                $albumId = generateUuid();
+                dbQuery("INSERT INTO gallery_albums (id, title, category, graduatingSetId) VALUES (?, ?, ?, ?)", [$albumId, $albumTitle, $category, $graduatingSetId ?: null]);
+            }
         }
 
         $createdPhotos = [];
         foreach ($photos as $p) {
-            $url = $p['url'] ?? '';
-            $caption = $p['caption'] ?? '';
-            $isFeatured = !empty($p['isFeatured']) ? 1 : 0;
+            $url = trim($p['url'] ?? $p['photoUrl'] ?? '');
+            $caption = trim($p['caption'] ?? '');
+            $itemFeatured = array_key_exists('isFeatured', $p) ? (!empty($p['isFeatured']) ? 1 : 0) : $topIsFeatured;
             if (!$url) continue;
 
             $mediaId = generateUuid();
-            dbQuery("INSERT INTO media (id, cloudinaryPublicId, secureUrl, folder) VALUES (?, ?, ?, 'gallery')", [$mediaId, 'gal-' . time() . '-' . rand(100, 999), $url]);
+            dbQuery("INSERT INTO media (id, cloudinaryPublicId, secureUrl, folder) VALUES (?, ?, ?, 'gallery')", [$mediaId, 'gal-' . time() . '-' . rand(1000, 9999), $url]);
 
             $photoId = generateUuid();
-            dbQuery("INSERT INTO gallery_photos (id, albumId, mediaId, caption, uploadedById, isFeatured) VALUES (?, ?, ?, ?, ?, ?)", [$photoId, $albumId, $mediaId, $caption, $user['id'], $isFeatured]);
+            dbQuery("INSERT INTO gallery_photos (id, albumId, mediaId, caption, uploadedById, isFeatured) VALUES (?, ?, ?, ?, ?, ?)", [$photoId, $albumId, $mediaId, $caption, $user['id'], $itemFeatured]);
 
-            $createdPhotos[] = ['id' => $photoId, 'photoUrl' => $url, 'caption' => $caption];
+            $createdPhotos[] = ['id' => $photoId, 'photoUrl' => $url, 'caption' => $caption, 'isFeatured' => $itemFeatured];
         }
 
         cacheForget('gallery:landing-page');

@@ -28,7 +28,7 @@ export default function Gallery({ onNavigate }: GalleryProps) {
     let url = "/api/gallery/albums";
     if (activeCategory !== "All") url += `?category=${encodeURIComponent(activeCategory)}`;
     apiFetch(url)
-      .then(res => setAlbums(res.data || []))
+      .then(res => setAlbums(Array.isArray(res) ? res : (res?.data || [])))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
   };
@@ -162,8 +162,8 @@ export default function Gallery({ onNavigate }: GalleryProps) {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {filtered.map((album) => {
-              const coverImg = album.photos?.[0]?.media?.secureUrl || album.photos?.[0]?.media?.url || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=400&fit=crop&auto=format";
-              const photoCount = album._count?.photos || album.photos?.length || 0;
+              const coverImg = album.coverUrl || album.photos?.[0]?.media?.secureUrl || album.photos?.[0]?.media?.url || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=400&fit=crop&auto=format";
+              const photoCount = album.photoCount || album._count?.photos || album.photos?.length || 0;
 
               return (
                 <div key={album.id || album.title} onClick={() => fetchAlbumDetail(album.id)} className="bg-white border border-[var(--border)] rounded overflow-hidden hover:shadow-md transition-shadow cursor-pointer group">
