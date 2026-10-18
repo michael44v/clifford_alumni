@@ -239,7 +239,7 @@ function handleAdminRoutes(string $endpoint, string $method): void {
         requireRole($user, ['ADMIN', 'SUPER_ADMIN']);
         $body = getRequestBody();
         $isAlumniOfWeek = !empty($body['isAlumniOfWeek']) ? 1 : 0;
-        $bio = trim($body['bio'] ?? '');
+        $bio = trim($body['alumniOfWeekBio'] ?? $body['bio'] ?? '');
 
         if ($isAlumniOfWeek) {
             dbQuery("UPDATE members SET isAlumniOfWeek = 0");

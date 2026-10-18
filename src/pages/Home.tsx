@@ -322,11 +322,11 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
               ) : alumniOfWeek ? (
                 <>
                   <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-[var(--accent)] flex-shrink-0 bg-slate-200 flex items-center justify-center">
-                    {alumniOfWeek.photoUrl || alumniOfWeek.profilePhoto?.secureUrl ? (
-                      <img src={alumniOfWeek.photoUrl || alumniOfWeek.profilePhoto?.secureUrl} alt={`${alumniOfWeek.firstName} ${alumniOfWeek.lastName}`} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="font-bold text-xl text-slate-500">{alumniOfWeek.firstName?.[0]}{alumniOfWeek.lastName?.[0]}</span>
-                    )}
+                    <img
+                      src={alumniOfWeek.photoUrl || alumniOfWeek.profilePhoto?.secureUrl || "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg"}
+                      alt={`${alumniOfWeek.firstName} ${alumniOfWeek.lastName}`}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                   <div>
                     <span className="inline-block px-2 py-0.5 bg-[var(--accent)] text-[var(--secondary)] text-[10px] font-bold rounded mb-2">🏆 This Week</span>
