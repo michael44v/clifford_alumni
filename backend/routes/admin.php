@@ -199,7 +199,24 @@ function handleAdminRoutes(string $endpoint, string $method): void {
         }
 
         $sql .= " ORDER BY m.createdAt DESC";
-        jsonResponse(dbQuery($sql, $params));
+        $members = dbQuery($sql, $params);
+        if (is_array($members)) {
+            foreach ($members as &$mem) {
+                $mem['isFeatured'] = !empty($mem['isFeatured']) ? 1 : 0;
+                $mem['isAlumniOfWeek'] = !empty($mem['isAlumniOfWeek']) ? 1 : 0;
+            }
+        }
+        jsonResponse($members);
+    }
+
+    if ($method === 'PUT' && preg_match('#^/api/admin/members/([^/]+)$#', $endpoint, $m)) {
+        requireRole($user, ['ADMIN', 'SUPER_ADMIN']);
+        $body = getRequestBody();
+        $status = trim($body['verificationStatus'] ?? $body['status'] ?? '');
+        if ($status) {
+            dbQuery("UPDATE members SET verificationStatus = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?", [$status, $m[1]]);
+        }
+        jsonResponse(['message' => 'Member updated successfully']);
     }
 
     if ($method === 'GET' && preg_match('#^/api/admin/members/([^/]+)/details$#', $endpoint, $m)) {
