@@ -13,6 +13,7 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
   const [myWelfare, setMyWelfare] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [isCompletionDismissed, setIsCompletionDismissed] = useState(false);
   const [setsList, setSetsList] = useState<any[]>([]);
   const [facultiesList, setFacultiesList] = useState<any[]>([]);
   const [departmentsList, setDepartmentsList] = useState<any[]>([]);
@@ -95,15 +96,28 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
     }
   };
 
+  const DEFAULT_AVATAR = "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg";
   const memberName = me ? `${me.firstName || ''} ${me.lastName || ''}`.trim() : "Member";
   const setName = me?.graduatingSet?.setName || "Alumni";
   const facName = me?.faculty?.name || "";
-  const profilePhoto = me?.profilePhotoUrl || me?.profilePhoto?.secureUrl || "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg";
+  const profilePhoto = me?.profilePhotoUrl || me?.profilePhoto?.secureUrl || DEFAULT_AVATAR;
   const status = me?.verificationStatus || "VERIFIED";
 
   // Calculate profile completion percentage
-  const fields = [me?.firstName, me?.lastName, me?.phone, me?.profession, me?.company, me?.bio, me?.profilePhoto?.secureUrl];
-  const filledFields = fields.filter(Boolean).length;
+  const fields = [
+    me?.firstName,
+    me?.lastName,
+    me?.email,
+    me?.phone,
+    me?.profession,
+    me?.company,
+    me?.bio,
+    me?.profilePhotoUrl,
+    me?.graduatingSetId,
+    me?.facultyId,
+    me?.department,
+  ];
+  const filledFields = fields.filter(f => f && String(f).trim() !== '').length;
   const profileCompletion = Math.round((filledFields / fields.length) * 100);
 
   const pendingDuesList = dues.filter(d => d.status !== "PAID");
@@ -113,8 +127,16 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
     <div className="bg-[var(--background)] min-h-screen">
       <div className="bg-[var(--secondary)] py-8 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[var(--accent)] flex-shrink-0">
-            <img src={profilePhoto} alt={memberName} className="w-full h-full object-cover" />
+          <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[var(--accent)] flex-shrink-0 bg-slate-200">
+            <img
+              src={profilePhoto}
+              alt={memberName}
+              className="w-full h-full object-cover"
+              onError={e => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = DEFAULT_AVATAR;
+              }}
+            />
           </div>
           <div className="flex-1">
             <p className="text-[var(--accent)] text-xs font-semibold tracking-widest uppercase">Member Dashboard</p>
@@ -133,18 +155,33 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-        {/* Profile completion */}
-        <div className="bg-amber-50 border border-amber-200 rounded p-4 mb-6 flex items-center gap-4">
-          <div className="flex-1">
-            <p className="text-sm font-medium text-amber-800 mb-1">Your profile is {profileCompletion}% complete</p>
-            <div className="w-full h-2 bg-amber-200 rounded-full overflow-hidden">
-              <div className="h-full bg-amber-500 rounded-full" style={{ width: `${profileCompletion}%` }} />
+        {/* Profile completion banner */}
+        {!isCompletionDismissed && (
+          <div className={`border rounded p-4 mb-6 flex items-center gap-4 relative ${profileCompletion === 100 ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"}`}>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <p className={`text-sm font-semibold ${profileCompletion === 100 ? "text-green-800" : "text-amber-800"}`}>
+                  {profileCompletion === 100 ? "🎉 Your profile is 100% complete! (Completed)" : `Your profile is ${profileCompletion}% complete`}
+                </p>
+              </div>
+              <div className={`w-full h-2 rounded-full overflow-hidden ${profileCompletion === 100 ? "bg-green-200" : "bg-amber-200"}`}>
+                <div className={`h-full rounded-full transition-all duration-500 ${profileCompletion === 100 ? "bg-green-600" : "bg-amber-500"}`} style={{ width: `${profileCompletion}%` }} />
+              </div>
             </div>
+            {profileCompletion < 100 && (
+              <button onClick={() => setActiveTab("profile")} className="px-4 py-2 bg-amber-500 text-white rounded text-xs font-semibold hover:bg-amber-600 transition-colors whitespace-nowrap">
+                Complete Profile
+              </button>
+            )}
+            <button
+              onClick={() => setIsCompletionDismissed(true)}
+              className="text-gray-400 hover:text-gray-600 font-bold text-sm p-1 ml-1"
+              title="Dismiss banner"
+            >
+              ✕
+            </button>
           </div>
-          <button onClick={() => setActiveTab("profile")} className="px-4 py-2 bg-amber-500 text-white rounded text-xs font-semibold hover:bg-amber-600 transition-colors whitespace-nowrap">
-            Complete Profile
-          </button>
-        </div>
+        )}
 
         {/* Tabs */}
         <div className="flex overflow-x-auto gap-1 bg-[var(--muted)] p-1 rounded mb-6 hide-scrollbar">
@@ -202,8 +239,16 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
         {activeTab === "profile" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="bg-white border border-[var(--border)] rounded p-5 text-center">
-              <div className="w-28 h-28 mx-auto rounded-full overflow-hidden border-2 border-[var(--primary)] mb-3 relative group">
-                <img src={profileForm.profilePhotoUrl || profilePhoto} alt={memberName} className="w-full h-full object-cover" />
+              <div className="w-28 h-28 mx-auto rounded-full overflow-hidden border-2 border-[var(--primary)] mb-3 relative group bg-slate-200">
+                <img
+                  src={profileForm.profilePhotoUrl || profilePhoto}
+                  alt={memberName}
+                  className="w-full h-full object-cover"
+                  onError={e => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = DEFAULT_AVATAR;
+                  }}
+                />
               </div>
               <h3 className="font-semibold text-[var(--foreground)]">{memberName}</h3>
               <p className="text-xs text-[var(--primary)] font-medium mt-0.5">{setName} · {facName}</p>

@@ -9,10 +9,14 @@ export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
   const [search, setSearch] = useState("");
   const [selectedFacultyId, setSelectedFacultyId] = useState("ALL");
   const [selectedSetId, setSelectedSetId] = useState("ALL");
+  const [selectedDepartment, setSelectedDepartment] = useState("ALL");
+  const [page, setPage] = useState(1);
 
   const [faculties, setFaculties] = useState<any[]>([]);
   const [sets, setSets] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
   const [alumni, setAlumni] = useState<any[]>([]);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 12, totalPages: 1 });
   const [loading, setLoading] = useState(false);
   const [selectedAlum, setSelectedAlum] = useState<any | null>(null);
 
@@ -21,31 +25,43 @@ export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
     Promise.all([
       apiFetch("/api/admin/faculties").catch(() => []),
       apiFetch("/api/admin/sets").catch(() => []),
-    ]).then(([facRes, setRes]) => {
+      apiFetch("/api/admin/departments").catch(() => []),
+    ]).then(([facRes, setRes, deptRes]) => {
       setFaculties(Array.isArray(facRes) ? facRes : []);
       setSets(Array.isArray(setRes) ? setRes : []);
+      setDepartments(Array.isArray(deptRes) ? deptRes : []);
     });
   }, []);
 
   useEffect(() => {
-    if (!isLoggedIn) return;
     setLoading(true);
 
-    let url = `/api/members/directory?search=${encodeURIComponent(search)}`;
+    let url = `/api/members/directory?page=${page}&limit=12&search=${encodeURIComponent(search)}`;
     if (selectedFacultyId !== "ALL") url += `&facultyId=${encodeURIComponent(selectedFacultyId)}`;
     if (selectedSetId !== "ALL") url += `&setId=${encodeURIComponent(selectedSetId)}`;
+    if (selectedDepartment !== "ALL") url += `&department=${encodeURIComponent(selectedDepartment)}`;
 
     apiFetch(url)
-      .then(res => setAlumni(res.data || []))
+      .then(res => {
+        if (res?.data) {
+          setAlumni(res.data);
+          setPagination(res.pagination || { total: res.data.length, page: 1, limit: 12, totalPages: 1 });
+        } else if (Array.isArray(res)) {
+          setAlumni(res);
+          setPagination({ total: res.length, page: 1, limit: 12, totalPages: 1 });
+        } else {
+          setAlumni([]);
+          setPagination({ total: 0, page: 1, limit: 12, totalPages: 1 });
+        }
+      })
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
-  }, [isLoggedIn, search, selectedFacultyId, selectedSetId]);
+  }, [search, selectedFacultyId, selectedSetId, selectedDepartment, page]);
 
-  const filtered = alumni.filter(a => {
-    const matchFaculty = selectedFacultyId === "ALL" || a.facultyId === selectedFacultyId || a.faculty?.id === selectedFacultyId;
-    const matchSet = selectedSetId === "ALL" || a.graduatingSetId === selectedSetId || a.graduatingSet?.id === selectedSetId;
-    return matchFaculty && matchSet;
-  });
+  const handleFilterChange = (setter: (val: string) => void) => (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setter(e.target.value);
+    setPage(1);
+  };
 
   return (
     <div className="bg-[var(--background)]">
@@ -83,28 +99,39 @@ export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
             />
             <button className="px-6 py-2.5 bg-[var(--primary)] text-white rounded-lg text-sm font-semibold hover:bg-[var(--accent)] transition-colors">Search</button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <select value={selectedFacultyId} onChange={e => setSelectedFacultyId(e.target.value)} className="px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <select value={selectedFacultyId} onChange={handleFilterChange(setSelectedFacultyId)} className="px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
               <option value="ALL">All Faculties</option>
               {faculties.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
-            <select value={selectedSetId} onChange={e => setSelectedSetId(e.target.value)} className="px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
+            <select value={selectedSetId} onChange={handleFilterChange(setSelectedSetId)} className="px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
               <option value="ALL">All Graduating Sets</option>
               {sets.map(s => <option key={s.id} value={s.id}>{s.setName} ({s.graduationYear})</option>)}
+            </select>
+            <select value={selectedDepartment} onChange={handleFilterChange(setSelectedDepartment)} className="px-3 py-2.5 border border-[var(--border)] rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--ring)]">
+              <option value="ALL">All Departments</option>
+              {departments.map(d => <option key={d.id || d.name} value={d.name}>{d.name}</option>)}
             </select>
           </div>
         </div>
 
-        <p className="text-sm text-[var(--muted-foreground)] mb-6">
-          Showing <strong>{filtered.length}</strong> alumni
-          {search && ` matching "${search}"`}
-        </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-2">
+          <p className="text-sm text-[var(--muted-foreground)]">
+            Showing <strong>{alumni.length}</strong> of <strong>{pagination.total}</strong> alumni
+            {search && ` matching "${search}"`}
+          </p>
+          {pagination.totalPages > 1 && (
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Page <strong>{pagination.page}</strong> of <strong>{pagination.totalPages}</strong>
+            </p>
+          )}
+        </div>
 
         {loading ? (
           <GridSkeleton count={8} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filtered.map((alum) => {
+            {alumni.map((alum) => {
               const fullName = `${alum.firstName || ''} ${alum.lastName || ''}`.trim() || 'Alumnus';
               const imgUrl = alum.photoUrl || alum.profilePhoto?.secureUrl || "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg";
               const setName = alum.graduatingSet?.setName || "Alumni";
@@ -134,11 +161,49 @@ export default function Directory({ onNavigate, isLoggedIn }: DirectoryProps) {
           </div>
         )}
 
-        {!loading && filtered.length === 0 && (
+        {!loading && alumni.length === 0 && (
           <div className="text-center py-16 text-[var(--muted-foreground)]">
             <p className="text-4xl mb-3">🔍</p>
             <p className="font-semibold">No alumni found</p>
-            <p className="text-sm mt-1">{isLoggedIn ? "Try adjusting your search terms or filters." : "Please sign in to view the verified alumni directory."}</p>
+            <p className="text-sm mt-1">Try adjusting your search terms or filters.</p>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {!loading && pagination.totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-10">
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className="px-4 py-2 border border-[var(--border)] rounded-lg text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--muted)] transition-colors"
+            >
+              ← Previous
+            </button>
+            <div className="flex gap-1">
+              {Array.from({ length: pagination.totalPages }).map((_, idx) => {
+                const pageNum = idx + 1;
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setPage(pageNum)}
+                    className={`w-8 h-8 rounded-lg text-xs font-bold transition-colors ${
+                      page === pageNum
+                        ? "bg-[var(--primary)] text-white"
+                        : "border border-[var(--border)] hover:bg-[var(--muted)] text-[var(--foreground)]"
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              disabled={page >= pagination.totalPages}
+              onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+              className="px-4 py-2 border border-[var(--border)] rounded-lg text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--muted)] transition-colors"
+            >
+              Next →
+            </button>
           </div>
         )}
       </div>

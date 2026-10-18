@@ -61,7 +61,7 @@ function handleEventRoutes(string $endpoint, string $method): void {
 
         dbQuery("INSERT INTO events (id, title, slug, description, bannerMediaId, eventDate, time, venue, isVirtual, meetingLink, category, createdById) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [$newId, $title, $slug, $description, $bannerMediaId, $eventDate, $time, $venue, $isVirtual, $meetingLink, $category, $user['id']]);
 
-        cacheForget('events:list');
+        cacheFlushPrefix('events');
         jsonResponse(dbQueryOne("SELECT * FROM events WHERE id = ?", [$newId]), 201);
     }
 
@@ -69,8 +69,7 @@ function handleEventRoutes(string $endpoint, string $method): void {
         requireRole($user, ['ADMIN', 'SUPER_ADMIN', 'CONTENT_ADMIN']);
         $id = $m[1];
         dbQuery("DELETE FROM events WHERE id = ?", [$id]);
-        cacheForget('events:list');
-        cacheForget("events:item:{$id}");
+        cacheFlushPrefix('events');
         jsonResponse(['message' => 'Event deleted successfully']);
     }
 

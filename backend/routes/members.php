@@ -35,35 +35,63 @@ function handleMemberRoutes(string $endpoint, string $method): void {
     if ($method === 'GET' && $endpoint === '/api/members/directory') {
         $facultyId = $_GET['facultyId'] ?? null;
         $setId = $_GET['setId'] ?? null;
+        $department = $_GET['department'] ?? null;
         $search = $_GET['search'] ?? null;
+        $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+        $limit = isset($_GET['limit']) ? min(100, max(1, intval($_GET['limit']))) : 12;
+        $offset = ($page - 1) * $limit;
+
+        $where = ["m.verificationStatus = 'VERIFIED'"];
+        $params = [];
+
+        if ($facultyId && $facultyId !== 'ALL') {
+            $where[] = "m.facultyId = ?";
+            $params[] = $facultyId;
+        }
+
+        if ($setId && $setId !== 'ALL') {
+            $where[] = "m.graduatingSetId = ?";
+            $params[] = $setId;
+        }
+
+        if ($department && $department !== 'ALL') {
+            $where[] = "m.department = ?";
+            $params[] = $department;
+        }
+
+        if ($search && trim($search) !== '') {
+            $where[] = "(m.firstName LIKE ? OR m.lastName LIKE ? OR m.profession LIKE ? OR m.company LIKE ? OR m.department LIKE ?)";
+            $searchTerm = "%" . trim($search) . "%";
+            $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm, $searchTerm, $searchTerm]);
+        }
+
+        $whereSql = implode(" AND ", $where);
+
+        $countRow = dbQueryOne("SELECT COUNT(*) as total FROM members m WHERE {$whereSql}", $params);
+        $total = intval($countRow['total'] ?? 0);
+        $totalPages = max(1, ceil($total / $limit));
 
         $sql = "SELECT m.id, m.firstName, m.lastName, m.profession, m.company, m.department, m.diasporaCountry, m.diasporaCity,
-                       g.setName, f.name as facultyName, med.secureUrl as photoUrl
+                       g.setName, g.graduationYear, f.name as facultyName, med.secureUrl as photoUrl
                 FROM members m
                 LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id
                 LEFT JOIN faculties f ON m.facultyId = f.id
                 LEFT JOIN media med ON m.profilePhotoMediaId = med.id
-                WHERE m.verificationStatus = 'VERIFIED'";
-        $params = [];
+                WHERE {$whereSql}
+                ORDER BY m.firstName ASC, m.lastName ASC
+                LIMIT {$limit} OFFSET {$offset}";
 
-        if ($facultyId) {
-            $sql .= " AND m.facultyId = ?";
-            $params[] = $facultyId;
-        }
+        $members = dbQuery($sql, $params);
 
-        if ($setId) {
-            $sql .= " AND m.graduatingSetId = ?";
-            $params[] = $setId;
-        }
-
-        if ($search) {
-            $sql .= " AND (m.firstName LIKE ? OR m.lastName LIKE ? OR m.profession LIKE ? OR m.company LIKE ?)";
-            $searchTerm = "%{$search}%";
-            $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm, $searchTerm]);
-        }
-
-        $sql .= " ORDER BY m.firstName ASC, m.lastName ASC";
-        jsonResponse(dbQuery($sql, $params));
+        jsonResponse([
+            'data' => $members,
+            'pagination' => [
+                'total' => $total,
+                'page' => $page,
+                'limit' => $limit,
+                'totalPages' => $totalPages
+            ]
+        ]);
     }
 
     // Protected Member Routes

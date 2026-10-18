@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { apiFetch } from "../lib/api";
 import { showToast } from "../components/Toast";
+import { Skeleton, TableRowSkeleton, CardSkeleton } from "../components/Skeleton";
 
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface AdminDashboardProps { onNavigate: (page: Page) => void; onLogout: () => void; }
@@ -696,8 +697,39 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
           ))}
         </div>
 
+        {/* Skeleton Loader during initial data fetch */}
+        {loading && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="bg-white border border-[var(--border)] rounded p-4 text-center space-y-2">
+                  <Skeleton className="h-6 w-1/2 mx-auto" />
+                  <Skeleton className="h-3 w-3/4 mx-auto" />
+                </div>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white border border-[var(--border)] rounded p-5 space-y-3">
+                <Skeleton className="h-5 w-1/3" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <div className="bg-white border border-[var(--border)] rounded p-5 space-y-3">
+                <Skeleton className="h-5 w-1/3" />
+                <div className="grid grid-cols-2 gap-3">
+                  <Skeleton className="h-20 w-full rounded" />
+                  <Skeleton className="h-20 w-full rounded" />
+                  <Skeleton className="h-20 w-full rounded" />
+                  <Skeleton className="h-20 w-full rounded" />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Overview Tab */}
-        {activeTab === "overview" && (
+        {!loading && activeTab === "overview" && (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
               {stats.map(s => (
@@ -784,7 +816,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         )}
 
         {/* Official Directory Roster Tab */}
-        {activeTab === "roster" && (
+        {!loading && activeTab === "roster" && (
           <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
             <div className="p-4 border-b border-[var(--border)] flex flex-col sm:flex-row gap-3 items-center justify-between">
               <div className="flex gap-2 w-full sm:w-auto">
@@ -845,7 +877,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         )}
 
         {/* Members Tab */}
-        {activeTab === "members" && (
+        {!loading && activeTab === "members" && (
           <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
             <div className="p-4 border-b border-[var(--border)] flex flex-col sm:flex-row gap-3 items-center justify-between">
               <div className="flex flex-wrap gap-2 w-full sm:w-auto">
@@ -997,7 +1029,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         )}
 
         {/* Media Tab */}
-        {activeTab === "media" && (
+        {!loading && activeTab === "media" && (
           <div className="bg-white border border-[var(--border)] rounded overflow-hidden p-5">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3 border-b border-[var(--border)] pb-4">
               <div>
@@ -1088,7 +1120,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         )}
 
         {/* Welfare Tab */}
-        {activeTab === "welfare" && (
+        {!loading && activeTab === "welfare" && (
           <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
             <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
               <div>
@@ -1136,7 +1168,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         )}
 
         {/* Payments & Dues Tab */}
-        {activeTab === "payments" && (
+        {!loading && activeTab === "payments" && (
           <div className="space-y-6">
             {/* Dues Manager Card */}
             <div className="bg-white border border-[var(--border)] rounded overflow-hidden">
@@ -1206,7 +1238,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         )}
 
         {/* Donations Tab */}
-        {activeTab === "donations" && (
+        {!loading && activeTab === "donations" && (
           <div className="space-y-6">
             {/* Impact Statistics Editor Card */}
             <div className="bg-white border border-[var(--border)] rounded p-5">
@@ -1299,7 +1331,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         )}
 
         {/* Content Tab */}
-        {activeTab === "content" && (
+        {!loading && activeTab === "content" && (
           <div className="space-y-8">
             {/* Quick Create buttons */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1442,7 +1474,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         )}
 
         {/* Settings Tab */}
-        {activeTab === "settings" && (
+        {!loading && activeTab === "settings" && (
           <div className="bg-white border border-[var(--border)] rounded p-6 max-w-xl">
             <h3 className="font-bold text-sm mb-3">Realtime Admin Controls</h3>
             <p className="text-xs text-[var(--muted-foreground)] leading-relaxed">
