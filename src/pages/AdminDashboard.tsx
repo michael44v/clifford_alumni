@@ -137,7 +137,9 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   }, [memberSearch, memberFilterStatus, memberFilterFaculty, memberFilterSet, rosterSearch]);
 
   const handleToggleFeaturedMember = async (m: any) => {
-    const nextVal = !m.isFeatured;
+    const isCurrentlyFeatured = Boolean(m.isFeatured === true || m.isFeatured === 1 || m.isFeatured === '1');
+    const nextVal = !isCurrentlyFeatured;
+
     // Optimistic UI update
     setMembers(prev => prev.map(mem => mem.id === m.id ? { ...mem, isFeatured: nextVal ? 1 : 0 } : mem));
     try {
@@ -149,7 +151,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       fetchData();
     } catch (err: any) {
       // Rollback on error
-      setMembers(prev => prev.map(mem => mem.id === m.id ? { ...mem, isFeatured: m.isFeatured } : mem));
+      setMembers(prev => prev.map(mem => mem.id === m.id ? { ...mem, isFeatured: m.isFeatured ? 1 : 0 } : mem));
       showToast(err.message || "Failed to update featured status", "error");
     }
   };
@@ -914,47 +916,61 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                         </span>
                       </td>
                       <td className="p-3" onClick={e => e.stopPropagation()}>
-                        <button
-                          onClick={() => handleToggleFeaturedMember(m)}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                            m.isFeatured ? "bg-purple-600" : "bg-gray-300"
-                          }`}
-                          title={m.isFeatured ? "Featured (Click to unfeature)" : "Unfeatured (Click to feature)"}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              m.isFeatured ? "translate-x-6" : "translate-x-1"
-                            }`}
-                          />
-                        </button>
-                        <span className="block text-[10px] font-bold mt-0.5 text-purple-700">
-                          {m.isFeatured ? "Featured" : "Off"}
-                        </span>
+                        {(() => {
+                          const isFeat = Boolean(m.isFeatured === true || m.isFeatured === 1 || m.isFeatured === '1');
+                          return (
+                            <>
+                              <button
+                                onClick={() => handleToggleFeaturedMember(m)}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                                  isFeat ? "bg-purple-600" : "bg-gray-300"
+                                }`}
+                                title={isFeat ? "Featured (Click to unfeature)" : "Unfeatured (Click to feature)"}
+                              >
+                                <span
+                                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                    isFeat ? "translate-x-6" : "translate-x-1"
+                                  }`}
+                                />
+                              </button>
+                              <span className="block text-[10px] font-bold mt-0.5 text-purple-700">
+                                {isFeat ? "Featured" : "Off"}
+                              </span>
+                            </>
+                          );
+                        })()}
                       </td>
                       <td className="p-3" onClick={e => e.stopPropagation()}>
-                        <button
-                          onClick={() => {
-                            if (m.isAlumniOfWeek) {
-                              handleUnsetAlumniOfWeek(m);
-                            } else {
-                              setShowAOTWModal(m);
-                              setAotwBio(m.alumniOfWeekBio || m.bio || "");
-                            }
-                          }}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                            m.isAlumniOfWeek ? "bg-amber-500" : "bg-gray-300"
-                          }`}
-                          title={m.isAlumniOfWeek ? "Current AOTW (Click to unset)" : "Set as AOTW (Only one allowed)"}
-                        >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              m.isAlumniOfWeek ? "translate-x-6" : "translate-x-1"
-                            }`}
-                          />
-                        </button>
-                        <span className="block text-[10px] font-bold mt-0.5 text-amber-800">
-                          {m.isAlumniOfWeek ? "🏆 AOTW Active" : "Off"}
-                        </span>
+                        {(() => {
+                          const isAotw = Boolean(m.isAlumniOfWeek === true || m.isAlumniOfWeek === 1 || m.isAlumniOfWeek === '1');
+                          return (
+                            <>
+                              <button
+                                onClick={() => {
+                                  if (isAotw) {
+                                    handleUnsetAlumniOfWeek(m);
+                                  } else {
+                                    setShowAOTWModal(m);
+                                    setAotwBio(m.alumniOfWeekBio || m.bio || "");
+                                  }
+                                }}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                                  isAotw ? "bg-amber-500" : "bg-gray-300"
+                                }`}
+                                title={isAotw ? "Current AOTW (Click to unset)" : "Set as AOTW (Only one allowed)"}
+                              >
+                                <span
+                                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                    isAotw ? "translate-x-6" : "translate-x-1"
+                                  }`}
+                                />
+                              </button>
+                              <span className="block text-[10px] font-bold mt-0.5 text-amber-800">
+                                {isAotw ? "🏆 AOTW Active" : "Off"}
+                              </span>
+                            </>
+                          );
+                        })()}
                       </td>
                       <td className="p-3" onClick={e => e.stopPropagation()}>
                         <div className="flex gap-1">
