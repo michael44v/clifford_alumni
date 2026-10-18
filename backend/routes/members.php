@@ -7,9 +7,9 @@ require_once __DIR__ . '/../middleware/auth.php';
 
 function handleMemberRoutes(string $endpoint, string $method): void {
     if ($method === 'GET' && $endpoint === '/api/members/alumni-of-the-week') {
-        header('Cache-Control: public, max-age=60, stale-while-revalidate=300');
-        $aow = cacheRemember('members:alumni-of-the-week', 300, function() {
-            return dbQueryOne("SELECT m.*, g.setName, f.name as facultyName, med.secureUrl as photoUrl
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        $aow = cacheRemember('members:alumni-of-the-week', 10, function() {
+            return dbQueryOne("SELECT m.*, g.setName, f.name as facultyName, med.secureUrl as photoUrl, med.secureUrl as profilePhotoUrl
                                FROM members m
                                LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id
                                LEFT JOIN faculties f ON m.facultyId = f.id
@@ -20,9 +20,9 @@ function handleMemberRoutes(string $endpoint, string $method): void {
     }
 
     if ($method === 'GET' && $endpoint === '/api/members/featured') {
-        header('Cache-Control: public, max-age=60, stale-while-revalidate=300');
-        $featured = cacheRemember('members:featured', 300, function() {
-            return dbQuery("SELECT m.id, m.firstName, m.lastName, m.profession, m.company, g.setName, f.name as facultyName, med.secureUrl as photoUrl
+        header('Cache-Control: no-cache, no-store, must-revalidate');
+        $featured = cacheRemember('members:featured', 10, function() {
+            return dbQuery("SELECT m.id, m.firstName, m.lastName, m.profession, m.company, g.setName, f.name as facultyName, med.secureUrl as photoUrl, med.secureUrl as profilePhotoUrl
                             FROM members m
                             LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id
                             LEFT JOIN faculties f ON m.facultyId = f.id
