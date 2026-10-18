@@ -137,19 +137,27 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   }, [memberSearch, memberFilterStatus, memberFilterFaculty, memberFilterSet, rosterSearch]);
 
   const handleToggleFeaturedMember = async (m: any) => {
+    const nextVal = !m.isFeatured;
+    // Optimistic UI update
+    setMembers(prev => prev.map(mem => mem.id === m.id ? { ...mem, isFeatured: nextVal ? 1 : 0 } : mem));
     try {
       await apiFetch(`/api/admin/members/${m.id}/featured`, {
         method: "PUT",
-        body: JSON.stringify({ isFeatured: !m.isFeatured }),
+        body: JSON.stringify({ isFeatured: nextVal }),
       });
-      showToast(m.isFeatured ? `${m.firstName} unfeatured successfully!` : `${m.firstName} featured on Home page!`, "success");
+      showToast(nextVal ? `${m.firstName} featured on Home page!` : `${m.firstName} unfeatured successfully!`, "success");
       fetchData();
     } catch (err: any) {
+      // Rollback on error
+      setMembers(prev => prev.map(mem => mem.id === m.id ? { ...mem, isFeatured: m.isFeatured } : mem));
       showToast(err.message || "Failed to update featured status", "error");
     }
   };
 
   const updateMemberStatus = async (id: string, verificationStatus: string) => {
+    const prevStatus = members.find(m => m.id === id)?.verificationStatus;
+    // Optimistic UI update
+    setMembers(prev => prev.map(m => m.id === id ? { ...m, verificationStatus } : m));
     try {
       await apiFetch(`/api/admin/members/${id}`, {
         method: "PUT",
@@ -161,6 +169,9 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       showToast(`Member status updated to ${verificationStatus}!`, "success");
       fetchData();
     } catch (err: any) {
+      if (prevStatus) {
+        setMembers(prev => prev.map(m => m.id === id ? { ...m, verificationStatus: prevStatus } : m));
+      }
       showToast(err.message || "Failed to update member status", "error");
     }
   };
@@ -267,8 +278,11 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const handleSetAlumniOfWeek = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!showAOTWModal) return;
+    const targetId = showAOTWModal.id;
+    // Optimistic UI update: unset all, then set target
+    setMembers(prev => prev.map(m => ({ ...m, isAlumniOfWeek: m.id === targetId ? 1 : 0 })));
     try {
-      await apiFetch(`/api/admin/members/${showAOTWModal.id}/alumni-of-the-week`, {
+      await apiFetch(`/api/admin/members/${targetId}/alumni-of-the-week`, {
         method: "PUT",
         body: JSON.stringify({
           isAlumniOfWeek: true,
@@ -279,11 +293,14 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setShowAOTWModal(null);
       fetchData();
     } catch (err: any) {
+      fetchData();
       showToast(err.message || "Failed to set Alumni of the Week", "error");
     }
   };
 
   const handleUnsetAlumniOfWeek = async (m: any) => {
+    // Optimistic UI update
+    setMembers(prev => prev.map(mem => mem.id === m.id ? { ...mem, isAlumniOfWeek: 0 } : mem));
     try {
       await apiFetch(`/api/admin/members/${m.id}/alumni-of-the-week`, {
         method: "PUT",
@@ -292,6 +309,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       showToast(`Unset ${m.firstName} as Alumni of the Week.`, "success");
       fetchData();
     } catch (err: any) {
+      fetchData();
       showToast(err.message || "Failed to unset Alumni of the Week", "error");
     }
   };
