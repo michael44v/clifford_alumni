@@ -323,9 +323,13 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
                 <>
                   <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-[var(--accent)] flex-shrink-0 bg-slate-200 flex items-center justify-center">
                     <img
-                      src={alumniOfWeek.photoUrl || alumniOfWeek.profilePhoto?.secureUrl || "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg"}
+                      src={alumniOfWeek.photoUrl || alumniOfWeek.profilePhotoUrl || alumniOfWeek.profilePhoto?.secureUrl || "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg"}
                       alt={`${alumniOfWeek.firstName} ${alumniOfWeek.lastName}`}
                       className="w-full h-full object-cover"
+                      onError={e => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg";
+                      }}
                     />
                   </div>
                   <div>
