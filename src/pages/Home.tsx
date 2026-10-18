@@ -372,8 +372,16 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
             {leadership.map((l) => (
               <div key={l.id || l.name} onClick={() => onNavigate("leadership")} className="text-center group cursor-pointer">
                 <div className="w-20 h-20 mx-auto mb-3 rounded-xl overflow-hidden border-2 border-[var(--primary)] bg-slate-100 flex items-center justify-center">
-                  {l.photoUrl || l.photo?.secureUrl ? (
-                    <img src={l.photoUrl || l.photo?.secureUrl} alt={l.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  {l.photoUrl || l.memberPhotoUrl || l.photo?.secureUrl ? (
+                    <img
+                      src={l.photoUrl || l.memberPhotoUrl || l.photo?.secureUrl}
+                      alt={l.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg";
+                      }}
+                    />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-400 font-bold text-xl">
                       {l.name ? l.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2) : "EX"}
