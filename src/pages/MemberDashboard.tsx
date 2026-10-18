@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { apiFetch } from "../lib/api";
+import { apiFetch, uploadToCloudinary } from "../lib/api";
 import { showToast } from "../components/Toast";
 
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
@@ -264,14 +264,15 @@ export default function MemberDashboard({ onNavigate }: MemberDashboardProps) {
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={e => {
+                      onChange={async e => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setProfileForm({ ...profileForm, profilePhotoUrl: reader.result as string });
-                          };
-                          reader.readAsDataURL(file);
+                          try {
+                            const res = await uploadToCloudinary(file, "alumni/avatars");
+                            setProfileForm({ ...profileForm, profilePhotoUrl: res.url });
+                          } catch (err) {
+                            console.error("Upload failed", err);
+                          }
                         }
                       }}
                       className="text-xs w-full bg-white border p-1 rounded"

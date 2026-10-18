@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { apiFetch } from "../lib/api";
+import { apiFetch, uploadToCloudinary } from "../lib/api";
 import { showToast } from "../components/Toast";
 import { Skeleton, TableRowSkeleton, CardSkeleton } from "../components/Skeleton";
 
@@ -1499,14 +1499,15 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={e => {
+                  onChange={async e => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        setReplacePhotoUrl(reader.result as string);
-                      };
-                      reader.readAsDataURL(file);
+                      try {
+                        const res = await uploadToCloudinary(file, "gallery");
+                        setReplacePhotoUrl(res.url);
+                      } catch (err) {
+                        console.error("Upload failed", err);
+                      }
                     }
                   }}
                   className="w-full text-xs border p-1 rounded bg-white"
@@ -1657,16 +1658,17 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                           <input
                             type="file"
                             accept="image/*"
-                            onChange={e => {
+                            onChange={async e => {
                               const file = e.target.files?.[0];
                               if (file) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
+                                try {
+                                  const res = await uploadToCloudinary(file, "gallery");
                                   const newUrls = [...adminImageUrls];
-                                  newUrls[idx] = reader.result as string;
+                                  newUrls[idx] = res.url;
                                   setAdminImageUrls(newUrls);
-                                };
-                                reader.readAsDataURL(file);
+                                } catch (err) {
+                                  console.error("Upload failed", err);
+                                }
                               }
                             }}
                             className="w-full text-[11px] bg-white border rounded p-1"
@@ -2409,14 +2411,15 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={e => {
+                      onChange={async e => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            setLeadershipForm({ ...leadershipForm, photoUrl: reader.result as string });
-                          };
-                          reader.readAsDataURL(file);
+                          try {
+                            const res = await uploadToCloudinary(file, "leadership");
+                            setLeadershipForm({ ...leadershipForm, photoUrl: res.url });
+                          } catch (err) {
+                            console.error("Upload failed", err);
+                          }
                         }
                       }}
                       className="w-full text-[11px] bg-white border p-1 rounded"
