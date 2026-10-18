@@ -238,26 +238,28 @@ function handleAdminRoutes(string $endpoint, string $method): void {
     if ($method === 'PUT' && preg_match('#^/api/admin/members/([^/]+)/alumni-of-the-week$#', $endpoint, $m)) {
         requireRole($user, ['ADMIN', 'SUPER_ADMIN']);
         $body = getRequestBody();
-        $isAlumniOfWeek = !empty($body['isAlumniOfWeek']) ? 1 : 0;
+        $val = $body['isAlumniOfWeek'] ?? null;
+        $isAlumniOfWeek = ($val === true || $val === 'true' || $val === 1 || $val === '1') ? 1 : 0;
         $bio = trim($body['alumniOfWeekBio'] ?? $body['bio'] ?? '');
 
-        if ($isAlumniOfWeek) {
+        if ($isAlumniOfWeek === 1) {
             dbQuery("UPDATE members SET isAlumniOfWeek = 0");
         }
 
         dbQuery("UPDATE members SET isAlumniOfWeek = ?, alumniOfWeekBio = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?", [$isAlumniOfWeek, $bio, $m[1]]);
         cacheForget('members:alumni-of-the-week');
-        jsonResponse(['message' => 'Alumni of the week updated successfully']);
+        jsonResponse(['message' => 'Alumni of the week updated successfully', 'isAlumniOfWeek' => $isAlumniOfWeek]);
     }
 
     if ($method === 'PUT' && preg_match('#^/api/admin/members/([^/]+)/featured$#', $endpoint, $m)) {
         requireRole($user, ['ADMIN', 'SUPER_ADMIN']);
         $body = getRequestBody();
-        $isFeatured = !empty($body['isFeatured']) ? 1 : 0;
+        $val = $body['isFeatured'] ?? null;
+        $isFeatured = ($val === true || $val === 'true' || $val === 1 || $val === '1') ? 1 : 0;
 
         dbQuery("UPDATE members SET isFeatured = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?", [$isFeatured, $m[1]]);
         cacheForget('members:featured');
-        jsonResponse(['message' => 'Member featured status updated successfully']);
+        jsonResponse(['message' => 'Member featured status updated successfully', 'isFeatured' => $isFeatured]);
     }
 
     // LEADERSHIP / EXCOS MANAGEMENT
