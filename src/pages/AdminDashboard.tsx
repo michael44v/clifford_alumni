@@ -142,9 +142,10 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         method: "PUT",
         body: JSON.stringify({ isFeatured: !m.isFeatured }),
       });
+      showToast(m.isFeatured ? `${m.firstName} unfeatured successfully!` : `${m.firstName} featured on Home page!`, "success");
       fetchData();
     } catch (err: any) {
-      alert(err.message || "Failed to update featured status");
+      showToast(err.message || "Failed to update featured status", "error");
     }
   };
 
@@ -157,6 +158,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       if (selectedMemberDetail && selectedMemberDetail.id === id) {
         setSelectedMemberDetail({ ...selectedMemberDetail, verificationStatus });
       }
+      showToast(`Member status updated to ${verificationStatus}!`, "success");
       fetchData();
     } catch (err: any) {
       showToast(err.message || "Failed to update member status", "error");
@@ -178,6 +180,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         method: "PUT",
         body: JSON.stringify({ isFeatured: !photo.isFeatured }),
       });
+      showToast(photo.isFeatured ? "Photo removed from landing page showcase." : "Photo added to landing page showcase!", "success");
       fetchData();
     } catch (err: any) {
       showToast(err.message || "Failed to update photo showcase status", "error");
@@ -188,6 +191,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     if (!confirm("Are you sure you want to delete this photo from the gallery?")) return;
     try {
       await apiFetch(`/api/admin/gallery/photos/${id}`, { method: "DELETE" });
+      showToast("Photo deleted successfully.", "success");
       fetchData();
     } catch (err: any) {
       showToast(err.message || "Failed to delete photo", "error");
@@ -197,7 +201,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const handleReplacePhotoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replacePhotoUrl) {
-      alert("Please enter a valid replacement image URL or upload an image file.");
+      showToast("Please enter a valid replacement image URL or upload an image file.", "error");
       return;
     }
     try {
@@ -230,7 +234,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       .filter(p => p.url.length > 0);
 
     if (validPhotos.length === 0) {
-      alert("Please enter at least one photo URL or upload an image file.");
+      showToast("Please enter at least one photo URL or upload an image file.", "error");
       return;
     }
 
@@ -247,7 +251,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         }),
       });
 
-      alert(`Successfully uploaded ${validPhotos.length} photo(s)!`);
+      showToast(`Successfully uploaded ${validPhotos.length} photo(s)!`, "success");
       setShowAdminUploadModal(false);
       setAdminUploadAlbumTitle("");
       setAdminImageUrls([""]);
@@ -271,7 +275,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
           alumniOfWeekBio: aotwBio,
         }),
       });
-      alert(`Set ${showAOTWModal.firstName} ${showAOTWModal.lastName} as Alumni of the Week!`);
+      showToast(`Set ${showAOTWModal.firstName} ${showAOTWModal.lastName} as Alumni of the Week!`, "success");
       setShowAOTWModal(null);
       fetchData();
     } catch (err: any) {
@@ -285,6 +289,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         method: "PUT",
         body: JSON.stringify({ isAlumniOfWeek: false }),
       });
+      showToast(`Unset ${m.firstName} as Alumni of the Week.`, "success");
       fetchData();
     } catch (err: any) {
       showToast(err.message || "Failed to unset Alumni of the Week", "error");
@@ -321,7 +326,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
           organizer: eventForm.organizer,
         }),
       });
-      alert("Event created successfully!");
+      showToast("Event created successfully!", "success");
       setShowEventModal(false);
       setEventForm({ title: "", description: "", date: "", time: "", venue: "", category: "General", organizer: "CUAA" });
       fetchData();
@@ -334,6 +339,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     if (!confirm("Delete this event?")) return;
     try {
       await apiFetch(`/api/events/${id}`, { method: "DELETE" });
+      showToast("Event deleted successfully.", "success");
       fetchData();
     } catch (err: any) {
       showToast(err.message || "Failed to delete event", "error");
@@ -347,7 +353,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         method: "POST",
         body: JSON.stringify(newsForm),
       });
-      alert("Announcement posted successfully!");
+      showToast("Announcement posted successfully!", "success");
       setShowNewsModal(false);
       setNewsForm({ title: "", content: "", category: "OFFICIAL_ANNOUNCEMENT" });
       fetchData();
@@ -360,6 +366,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     if (!confirm("Delete this announcement?")) return;
     try {
       await apiFetch(`/api/news/${id}`, { method: "DELETE" });
+      showToast("Announcement deleted successfully.", "success");
       fetchData();
     } catch (err: any) {
       showToast(err.message || "Failed to delete announcement", "error");
@@ -440,7 +447,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
             termStart: Number(leadershipForm.termStart),
           }),
         });
-        alert("EXCO leadership profile updated!");
+        showToast("EXCO leadership profile updated!", "success");
       } else {
         await apiFetch("/api/admin/leadership", {
           method: "POST",
@@ -449,7 +456,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
             termStart: Number(leadershipForm.termStart),
           }),
         });
-        alert("EXCO leadership profile added!");
+        showToast("EXCO leadership profile added!", "success");
       }
       setShowLeadershipModal(false);
       setEditingLeader(null);
@@ -464,6 +471,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     if (!confirm("Delete this opportunity post?")) return;
     try {
       await apiFetch(`/api/community/posts/${id}`, { method: "DELETE" });
+      showToast("Job post deleted successfully.", "success");
       fetchData();
     } catch (err: any) {
       showToast(err.message || "Failed to delete post", "error");
@@ -474,6 +482,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     if (!confirm("Delete this leadership profile?")) return;
     try {
       await apiFetch(`/api/admin/leadership/${id}`, { method: "DELETE" });
+      showToast("Leadership profile deleted successfully.", "success");
       fetchData();
     } catch (err: any) {
       showToast(err.message || "Failed to delete leadership profile", "error");
@@ -491,7 +500,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
           description: setForm.description,
         }),
       });
-      alert("Graduating set created successfully!");
+      showToast("Graduating set created successfully!", "success");
       setShowSetModal(false);
       setSetForm({ setName: "", graduationYear: new Date().getFullYear(), description: "" });
       fetchData();
@@ -504,7 +513,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     if (!confirm("Are you sure you want to delete this graduating set?")) return;
     try {
       await apiFetch(`/api/admin/sets/${id}`, { method: "DELETE" });
-      alert("Graduating set deleted.");
+      showToast("Graduating set deleted successfully.", "success");
       fetchData();
     } catch (err: any) {
       showToast(err.message || "Failed to delete graduating set", "error");
@@ -518,7 +527,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         method: "POST",
         body: JSON.stringify(rosterForm),
       });
-      alert("Matriculation entry added to official directory roster!");
+      showToast("Matriculation entry added to official directory roster!", "success");
       setShowRosterModal(false);
       setRosterForm({ matricNumber: "", firstName: "", lastName: "", facultyId: "", graduatingSetId: "", department: "" });
       fetchData();
@@ -531,6 +540,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     if (!confirm("Remove this entry from the official directory roster?")) return;
     try {
       await apiFetch(`/api/admin/official-directory/${id}`, { method: "DELETE" });
+      showToast("Entry removed from official directory roster.", "success");
       fetchData();
     } catch (err: any) {
       showToast(err.message || "Failed to delete entry", "error");
@@ -550,7 +560,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
           description: duesForm.description,
         }),
       });
-      alert("Dues item created successfully!");
+      showToast("Dues item created successfully!", "success");
       setShowDuesModal(false);
       setDuesForm({ title: "", amount: "", type: "ANNUAL_DUES", academicYear: "2024/2025", description: "" });
       fetchData();
@@ -563,6 +573,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     if (!confirm("Delete this dues item?")) return;
     try {
       await apiFetch(`/api/finance/dues/${id}`, { method: "DELETE" });
+      showToast("Dues item deleted successfully.", "success");
       fetchData();
     } catch (err: any) {
       showToast(err.message || "Failed to delete dues item", "error");
@@ -581,7 +592,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
             targetAmount: Number(campaignForm.targetAmount),
           }),
         });
-        alert("Donation cause updated!");
+        showToast("Donation cause updated!", "success");
       } else {
         await apiFetch("/api/finance/campaigns", {
           method: "POST",
@@ -591,7 +602,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
             targetAmount: Number(campaignForm.targetAmount),
           }),
         });
-        alert("Donation cause created!");
+        showToast("Donation cause created!", "success");
       }
       setShowCampaignModal(false);
       setEditingCampaign(null);
@@ -606,6 +617,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     if (!confirm("Delete this donation cause?")) return;
     try {
       await apiFetch(`/api/finance/campaigns/${id}`, { method: "DELETE" });
+      showToast("Donation cause deleted successfully.", "success");
       fetchData();
     } catch (err: any) {
       showToast(err.message || "Failed to delete donation cause", "error");
@@ -619,7 +631,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         method: "PUT",
         body: JSON.stringify({ scholarshipsAwarded: Number(scholarshipsForm) }),
       });
-      alert("Impact statistics updated!");
+      showToast("Impact statistics updated successfully!", "success");
       fetchData();
     } catch (err: any) {
       showToast(err.message || "Failed to update impact statistics", "error");
@@ -865,34 +877,66 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                       <td className="p-3 font-semibold text-[var(--primary)] underline">{m.firstName} {m.lastName}</td>
                       <td className="p-3 text-[var(--muted-foreground)]">{m.email}<br />{m.phone || '—'}</td>
                       <td className="p-3 text-[var(--muted-foreground)]">{m.matricNumber || 'N/A'}<br /><span className="text-[10px] font-semibold">{m.memberType}</span></td>
-                      <td className="p-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${m.verificationStatus === "VERIFIED" ? "bg-green-100 text-green-700" : m.verificationStatus === "PENDING" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
+                      <td className="p-3" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => updateMemberStatus(m.id, m.verificationStatus === "VERIFIED" ? "SUSPENDED" : "VERIFIED")}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                            m.verificationStatus === "VERIFIED" ? "bg-green-600" : "bg-gray-300"
+                          }`}
+                          title={`Click to ${m.verificationStatus === "VERIFIED" ? "Suspend" : "Verify"}`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              m.verificationStatus === "VERIFIED" ? "translate-x-6" : "translate-x-1"
+                            }`}
+                          />
+                        </button>
+                        <span className="block text-[10px] font-bold mt-0.5 text-slate-600">
                           {m.verificationStatus}
                         </span>
                       </td>
                       <td className="p-3" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => handleToggleFeaturedMember(m)}
-                          className={`px-2 py-1 rounded text-[10px] font-bold transition-colors ${
-                            m.isFeatured
-                              ? "bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-200"
-                              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                            m.isFeatured ? "bg-purple-600" : "bg-gray-300"
                           }`}
+                          title={m.isFeatured ? "Featured (Click to unfeature)" : "Unfeatured (Click to feature)"}
                         >
-                          {m.isFeatured ? "⭐ Featured Member" : "+ Feature Member"}
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              m.isFeatured ? "translate-x-6" : "translate-x-1"
+                            }`}
+                          />
                         </button>
+                        <span className="block text-[10px] font-bold mt-0.5 text-purple-700">
+                          {m.isFeatured ? "Featured" : "Off"}
+                        </span>
                       </td>
                       <td className="p-3" onClick={e => e.stopPropagation()}>
-                        {m.isAlumniOfWeek ? (
-                          <div className="flex items-center gap-2 text-amber-700 bg-amber-50 border border-amber-300 px-2 py-1 rounded font-bold text-[10px]">
-                            <span>🏆 Current AOTW</span>
-                            <button onClick={() => handleUnsetAlumniOfWeek(m)} className="text-[10px] text-red-600 underline font-semibold hover:text-red-800">Unset</button>
-                          </div>
-                        ) : (
-                          <button onClick={() => { setShowAOTWModal(m); setAotwBio(m.alumniOfWeekBio || m.bio || ""); }} className="px-2 py-1 bg-amber-50 border border-amber-300 text-amber-800 rounded text-[10px] font-semibold hover:bg-amber-100">
-                            + Set as AOTW
-                          </button>
-                        )}
+                        <button
+                          onClick={() => {
+                            if (m.isAlumniOfWeek) {
+                              handleUnsetAlumniOfWeek(m);
+                            } else {
+                              setShowAOTWModal(m);
+                              setAotwBio(m.alumniOfWeekBio || m.bio || "");
+                            }
+                          }}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                            m.isAlumniOfWeek ? "bg-amber-500" : "bg-gray-300"
+                          }`}
+                          title={m.isAlumniOfWeek ? "Current AOTW (Click to unset)" : "Set as AOTW (Only one allowed)"}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              m.isAlumniOfWeek ? "translate-x-6" : "translate-x-1"
+                            }`}
+                          />
+                        </button>
+                        <span className="block text-[10px] font-bold mt-0.5 text-amber-800">
+                          {m.isAlumniOfWeek ? "🏆 AOTW Active" : "Off"}
+                        </span>
                       </td>
                       <td className="p-3" onClick={e => e.stopPropagation()}>
                         <div className="flex gap-1">
