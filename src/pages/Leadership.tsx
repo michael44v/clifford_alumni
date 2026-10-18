@@ -66,11 +66,15 @@ export default function Leadership({ onNavigate }: LeadershipProps) {
               <div className="bg-white border border-[var(--border)] rounded overflow-hidden mb-10">
                 <div className="grid grid-cols-1 md:grid-cols-3">
                   <div className="h-64 md:h-auto bg-slate-100 flex items-center justify-center overflow-hidden">
-                    {president.photoUrl || president.photo?.secureUrl ? (
+                    {president.photoUrl || president.memberPhotoUrl || president.photo?.secureUrl ? (
                       <img
-                        src={president.photoUrl || president.photo?.secureUrl}
+                        src={president.photoUrl || president.memberPhotoUrl || president.photo?.secureUrl}
                         alt={president.name}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg";
+                        }}
                       />
                     ) : (
                       <div className="w-full h-full min-h-[200px] flex items-center justify-center bg-slate-200 text-slate-400 font-bold text-3xl">
@@ -102,8 +106,16 @@ export default function Leadership({ onNavigate }: LeadershipProps) {
                   {otherExcos.map((member) => (
                     <div key={member.id || member.name} className="bg-white border border-[var(--border)] rounded overflow-hidden hover:shadow-md transition-shadow">
                       <div className="h-48 bg-slate-100 flex items-center justify-center overflow-hidden">
-                        {member.photoUrl || member.photo?.secureUrl ? (
-                          <img src={member.photoUrl || member.photo?.secureUrl} alt={member.name} className="w-full h-full object-cover" />
+                        {member.photoUrl || member.memberPhotoUrl || member.photo?.secureUrl ? (
+                          <img
+                            src={member.photoUrl || member.memberPhotoUrl || member.photo?.secureUrl}
+                            alt={member.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg";
+                            }}
+                          />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-400 font-bold text-2xl">
                             {member.name ? member.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2) : "EX"}

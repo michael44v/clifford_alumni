@@ -2375,7 +2375,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                         memberId: selectedId,
                         name: `${found.firstName} ${found.lastName}`,
                         biography: leadershipForm.biography || found.bio || `${found.firstName} ${found.lastName} is a graduate of Clifford University (${found.graduatingSet?.setName || ''}) and active EXCO member.`,
-                        photoUrl: leadershipForm.photoUrl || found.profilePhoto?.secureUrl || "",
+                        photoUrl: leadershipForm.photoUrl || found.photoUrl || found.profilePhotoUrl || found.profilePhoto?.secureUrl || "",
                       });
                     } else {
                       setLeadershipForm({ ...leadershipForm, memberId: "" });

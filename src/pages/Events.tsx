@@ -17,7 +17,7 @@ export default function Events({ onNavigate, isLoggedIn }: EventsProps) {
   useEffect(() => {
     setLoading(true);
     apiFetch("/api/events")
-      .then(res => setEventsList(res.data || []))
+      .then(res => setEventsList(Array.isArray(res) ? res : (res?.data || [])))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
   }, []);

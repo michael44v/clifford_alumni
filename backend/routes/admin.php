@@ -22,7 +22,11 @@ function handleAdminRoutes(string $endpoint, string $method): void {
     if ($method === 'GET' && ($endpoint === '/api/admin/leadership' || $endpoint === '/api/members/leadership')) {
         header('Cache-Control: public, max-age=60, stale-while-revalidate=300');
         $data = cacheRemember('leadership:list', 300, function() {
-            return dbQuery("SELECT * FROM leadership_profiles ORDER BY orderIndex ASC, termStart DESC");
+            return dbQuery("SELECT l.*, COALESCE(NULLIF(l.photoUrl, ''), med.secureUrl) as photoUrl, med.secureUrl as memberPhotoUrl
+                            FROM leadership_profiles l
+                            LEFT JOIN members m ON l.memberId = m.id
+                            LEFT JOIN media med ON m.profilePhotoMediaId = med.id
+                            ORDER BY l.orderIndex ASC, l.termStart DESC");
         });
         jsonResponse($data);
     }

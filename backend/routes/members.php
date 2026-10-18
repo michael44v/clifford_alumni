@@ -41,7 +41,7 @@ function handleMemberRoutes(string $endpoint, string $method): void {
         $limit = isset($_GET['limit']) ? min(100, max(1, intval($_GET['limit']))) : 12;
         $offset = ($page - 1) * $limit;
 
-        $where = ["m.verificationStatus = 'VERIFIED'"];
+        $where = ["m.verificationStatus = 'VERIFIED'", "m.role NOT IN ('ADMIN', 'SUPER_ADMIN')"];
         $params = [];
 
         if ($facultyId && $facultyId !== 'ALL') {
