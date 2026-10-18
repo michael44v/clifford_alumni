@@ -854,7 +854,8 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                     <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Email / Phone</th>
                     <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Matric / Type</th>
                     <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Status</th>
-                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Featured / AOTW</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Featured</th>
+                    <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Alumni of the Week</th>
                     <th className="p-3 text-xs font-semibold text-[var(--muted-foreground)]">Actions</th>
                   </tr>
                 </thead>
@@ -870,29 +871,28 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                         </span>
                       </td>
                       <td className="p-3" onClick={e => e.stopPropagation()}>
-                        <div className="flex flex-col gap-1 items-start">
-                          <button
-                            onClick={() => handleToggleFeaturedMember(m)}
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              m.isFeatured
-                                ? "bg-purple-100 text-purple-700 border border-purple-300"
-                                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                            }`}
-                          >
-                            {m.isFeatured ? "⭐ Featured" : "+ Feature"}
+                        <button
+                          onClick={() => handleToggleFeaturedMember(m)}
+                          className={`px-2 py-1 rounded text-[10px] font-bold transition-colors ${
+                            m.isFeatured
+                              ? "bg-purple-100 text-purple-700 border border-purple-300 hover:bg-purple-200"
+                              : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                          }`}
+                        >
+                          {m.isFeatured ? "⭐ Featured Member" : "+ Feature Member"}
+                        </button>
+                      </td>
+                      <td className="p-3" onClick={e => e.stopPropagation()}>
+                        {m.isAlumniOfWeek ? (
+                          <div className="flex items-center gap-2 text-amber-700 bg-amber-50 border border-amber-300 px-2 py-1 rounded font-bold text-[10px]">
+                            <span>🏆 Current AOTW</span>
+                            <button onClick={() => handleUnsetAlumniOfWeek(m)} className="text-[10px] text-red-600 underline font-semibold hover:text-red-800">Unset</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => { setShowAOTWModal(m); setAotwBio(m.alumniOfWeekBio || m.bio || ""); }} className="px-2 py-1 bg-amber-50 border border-amber-300 text-amber-800 rounded text-[10px] font-semibold hover:bg-amber-100">
+                            + Set as AOTW
                           </button>
-
-                          {m.isAlumniOfWeek ? (
-                            <div className="flex items-center gap-1 text-amber-600 font-bold text-[10px]">
-                              <span>🏆 AOTW</span>
-                              <button onClick={() => handleUnsetAlumniOfWeek(m)} className="text-[10px] text-red-500 underline">Unset</button>
-                            </div>
-                          ) : (
-                            <button onClick={() => { setShowAOTWModal(m); setAotwBio(m.alumniOfWeekBio || m.bio || ""); }} className="px-2 py-0.5 bg-amber-50 border border-amber-300 text-amber-800 rounded text-[10px] font-semibold hover:bg-amber-100">
-                              Set AOTW
-                            </button>
-                          )}
-                        </div>
+                        )}
                       </td>
                       <td className="p-3" onClick={e => e.stopPropagation()}>
                         <div className="flex gap-1">
