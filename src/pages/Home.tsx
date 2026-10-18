@@ -270,17 +270,19 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {featuredAlumni.map((a) => {
               const fullName = `${a.firstName || ''} ${a.lastName || ''}`.trim();
-              const photo = a.photoUrl || a.profilePhoto?.secureUrl;
+              const photo = a.photoUrl || a.profilePhotoUrl || a.profilePhoto?.secureUrl || "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg";
               return (
                 <div key={a.id} onClick={() => onNavigate("directory")} className="bg-white border border-[var(--border)] rounded-lg overflow-hidden hover:shadow-md transition-shadow group cursor-pointer">
                   <div className="h-44 bg-slate-100 flex items-center justify-center overflow-hidden">
-                    {photo ? (
-                      <img src={photo} alt={fullName} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-400 font-bold text-2xl">
-                        {fullName ? fullName.split(" ").map(n => n[0]).join("").slice(0, 2) : "AL"}
-                      </div>
-                    )}
+                    <img
+                      src={photo}
+                      alt={fullName}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      onError={e => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg";
+                      }}
+                    />
                   </div>
                   <div className="p-4">
                     <p className="font-semibold text-sm text-[var(--foreground)]">{fullName}</p>

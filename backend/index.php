@@ -55,7 +55,11 @@ try {
 
     // Admin Routes
     if (strpos($endpoint, '/api/admin') === 0) {
-        handleAdminRoutes($endpoint, $method);
+        if (strpos($endpoint, '/api/admin/gallery') === 0) {
+            handleGalleryRoutes($endpoint, $method);
+        } else {
+            handleAdminRoutes($endpoint, $method);
+        }
     }
 
     // Member Routes

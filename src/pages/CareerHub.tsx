@@ -17,15 +17,14 @@ export default function CareerHub({ onNavigate, isLoggedIn }: CareerHubProps) {
   const [newPost, setNewPost] = useState({ title: "", content: "", category: "Career" });
 
   useEffect(() => {
-    if (!isLoggedIn) return;
     setLoading(true);
     let url = "/api/community/posts";
     if (categoryFilter !== "All") url += `?category=${encodeURIComponent(categoryFilter)}`;
     apiFetch(url)
-      .then(res => setPosts(res.data || []))
+      .then(res => setPosts(Array.isArray(res) ? res : (res?.data || [])))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
-  }, [isLoggedIn, categoryFilter]);
+  }, [categoryFilter]);
 
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,11 +99,6 @@ export default function CareerHub({ onNavigate, isLoggedIn }: CareerHubProps) {
                 <CardSkeleton />
                 <CardSkeleton />
               </div>
-            ) : !isLoggedIn ? (
-              <div className="text-center py-12 text-[var(--muted-foreground)] bg-white rounded border border-[var(--border)]">
-                <p className="font-semibold mb-2">Sign in to view career opportunities</p>
-                <button onClick={() => onNavigate("login")} className="px-5 py-2 bg-[var(--primary)] text-white text-xs font-semibold rounded hover:bg-[var(--accent)] transition-colors">Sign In</button>
-              </div>
             ) : filteredJobs.length === 0 ? (
               <div className="text-center py-12 text-[var(--muted-foreground)] bg-white rounded border border-[var(--border)]">
                 <p className="font-semibold">No career opportunities found</p>
@@ -113,7 +107,9 @@ export default function CareerHub({ onNavigate, isLoggedIn }: CareerHubProps) {
             ) : (
               <div className="flex flex-col gap-4">
                 {filteredJobs.map(job => {
-                  const authorName = job.author ? `${job.author.firstName || ''} ${job.author.lastName || ''}`.trim() : "Alumnus";
+                  const authorName = job.firstName && job.lastName
+                    ? `${job.firstName} ${job.lastName}`.trim()
+                    : (job.author ? `${job.author.firstName || ''} ${job.author.lastName || ''}`.trim() : "Alumnus");
 
                   return (
                     <div key={job.id} className="bg-white border border-[var(--border)] rounded p-5 hover:border-[var(--primary)] transition-colors">
