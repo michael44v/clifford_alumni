@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { apiFetch } from "../lib/api";
+import { apiFetch, uploadToCloudinary } from "../lib/api";
 import { showToast } from "../components/Toast";
 import { GridSkeleton } from "../components/Skeleton";
 
@@ -71,17 +71,17 @@ export default function Gallery({ onNavigate }: GalleryProps) {
     setCaptions(captions.filter((_, i) => i !== index));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = reader.result as string;
+    try {
+      const res = await uploadToCloudinary(file, "gallery");
       const updatedUrls = [...imageUrls];
-      updatedUrls[index] = result;
+      updatedUrls[index] = res.url;
       setImageUrls(updatedUrls);
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Upload failed", err);
+    }
   };
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
