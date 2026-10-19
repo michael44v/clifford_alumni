@@ -93,32 +93,19 @@ export async function uploadToCloudinary(file: File, folder: string = "alumni/up
   formData.append("signature", sigData.signature);
   formData.append("folder", sigData.folder);
 
-  try {
-    const cloudinaryRes = await fetch(`https://api.cloudinary.com/v1_1/${sigData.cloudName}/image/upload`, {
-      method: "POST",
-      body: formData,
-    });
+  const cloudinaryRes = await fetch(`https://api.cloudinary.com/v1_1/${sigData.cloudName}/image/upload`, {
+    method: "POST",
+    body: formData,
+  });
 
-    if (cloudinaryRes.ok) {
-      const result = await cloudinaryRes.json();
-      return {
-        url: result.secure_url,
-        publicId: result.public_id,
-      };
-    }
-  } catch (err) {
-    console.warn("Cloudinary direct upload failed, falling back to data URL", err);
+  if (!cloudinaryRes.ok) {
+    const errJson = await cloudinaryRes.json().catch(() => ({}));
+    throw new Error(errJson?.error?.message || "Cloudinary direct upload failed");
   }
 
-  // Fallback to Data URL if Cloudinary upload fails
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      resolve({
-        url: reader.result as string,
-        publicId: "local_" + Date.now(),
-      });
-    };
-    reader.readAsDataURL(file);
-  });
+  const result = await cloudinaryRes.json();
+  return {
+    url: result.secure_url,
+    publicId: result.public_id,
+  };
 }

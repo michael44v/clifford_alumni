@@ -21,6 +21,7 @@ export default function Gallery({ onNavigate }: GalleryProps) {
   const [uploadCategory, setUploadCategory] = useState("INDIVIDUAL_ALUMNI");
   const [selectedAlbumId, setSelectedAlbumId] = useState("");
   const [imageUrls, setImageUrls] = useState<string[]>([""]);
+  const [imageFiles, setImageFiles] = useState<(File | null)[]>([null]);
   const [captions, setCaptions] = useState<string[]>([""]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -63,41 +64,73 @@ export default function Gallery({ onNavigate }: GalleryProps) {
 
   const handleAddImageUrl = () => {
     setImageUrls([...imageUrls, ""]);
+    setImageFiles([...imageFiles, null]);
     setCaptions([...captions, ""]);
   };
 
   const handleRemoveImageUrl = (index: number) => {
     if (imageUrls.length <= 1) return;
     setImageUrls(imageUrls.filter((_, i) => i !== index));
+    setImageFiles(imageFiles.filter((_, i) => i !== index));
     setCaptions(captions.filter((_, i) => i !== index));
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    try {
-      const res = await uploadToCloudinary(file, "gallery");
+    const updatedFiles = [...imageFiles];
+    updatedFiles[index] = file;
+    setImageFiles(updatedFiles);
+
+    // Set temporary local preview URL
+    const reader = new FileReader();
+    reader.onloadend = () => {
       const updatedUrls = [...imageUrls];
-      updatedUrls[index] = res.url;
+      updatedUrls[index] = reader.result as string;
       setImageUrls(updatedUrls);
-    } catch (err) {
-      console.error("Upload failed", err);
-    }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validPhotos = imageUrls
-      .map((url, idx) => ({ url: url.trim(), caption: captions[idx] ? captions[idx].trim() : "" }))
-      .filter(p => p.url.length > 0);
+    const hasInputs = imageUrls.some((url) => url.trim().length > 0) || imageFiles.some((f) => f !== null);
 
-    if (validPhotos.length === 0) {
-      showToast("Please enter at least one photo URL or upload an image file.", "error");
+    if (!hasInputs) {
+      showToast("Please select at least one photo file or enter an image URL.", "error");
       return;
     }
 
     setIsSubmitting(true);
     try {
+      // 1. Upload files to Cloudinary sequentially and gather Cloudinary secure URLs
+      const validPhotos: { url: string; caption: string }[] = [];
+
+      for (let i = 0; i < imageUrls.length; i++) {
+        const file = imageFiles[i];
+        let url = imageUrls[i].trim();
+
+        if (file) {
+          showToast(`Uploading photo #${i + 1} to Cloudinary...`, "info");
+          const cloudinaryResult = await uploadToCloudinary(file, "gallery");
+          url = cloudinaryResult.url;
+        }
+
+        if (url && !url.startsWith("data:")) {
+          validPhotos.push({
+            url,
+            caption: captions[i] ? captions[i].trim() : "",
+          });
+        }
+      }
+
+      if (validPhotos.length === 0) {
+        showToast("No valid Cloudinary image URLs produced for upload.", "error");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 2. Send Cloudinary URLs to PHP backend to store in DB
       await apiFetch("/api/gallery/upload-multiple", {
         method: "POST",
         body: JSON.stringify({
