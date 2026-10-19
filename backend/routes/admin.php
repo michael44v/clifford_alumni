@@ -227,21 +227,25 @@ function handleAdminRoutes(string $endpoint, string $method): void {
         requireRole($user, ['ADMIN', 'SUPER_ADMIN']);
         $memberId = $m[1];
 
-        $memberInfo = dbQueryOne("SELECT m.*, g.setName, f.name as facultyName
+        $memberInfo = dbQueryOne("SELECT m.*, g.setName, g.graduationYear, f.name as facultyName, med.secureUrl as photoUrl, med.secureUrl as profilePhotoUrl
                                 FROM members m
                                 LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id
                                 LEFT JOIN faculties f ON m.facultyId = f.id
+                                LEFT JOIN media med ON m.profilePhotoMediaId = med.id
                                 WHERE m.id = ?", [$memberId]);
         if (!$memberInfo) jsonError("Member not found", 404);
 
+        $galleryPhotos = dbQuery("SELECT p.*, m.secureUrl as photoUrl FROM gallery_photos p JOIN media m ON p.mediaId = m.id WHERE p.uploadedById = ? ORDER BY p.createdAt DESC", [$memberId]);
         $payments = dbQuery("SELECT p.*, d.title as duesTitle FROM payment_records p LEFT JOIN dues_items d ON p.duesItemId = d.id WHERE p.memberId = ? ORDER BY p.createdAt DESC", [$memberId]);
         $welfare = dbQuery("SELECT * FROM welfare_requests WHERE memberId = ? ORDER BY createdAt DESC", [$memberId]);
 
-        jsonResponse([
-            'member' => $memberInfo,
-            'payments' => $payments,
-            'welfareRequests' => $welfare
-        ]);
+        $memberInfo['graduatingSet'] = ['setName' => $memberInfo['setName'] ?? null, 'graduationYear' => $memberInfo['graduationYear'] ?? null];
+        $memberInfo['faculty'] = ['name' => $memberInfo['facultyName'] ?? null];
+        $memberInfo['galleryPhotosUploaded'] = $galleryPhotos;
+        $memberInfo['paymentRecords'] = $payments;
+        $memberInfo['welfareRequests'] = $welfare;
+
+        jsonResponse($memberInfo);
     }
 
     if ($method === 'PUT' && preg_match('#^/api/admin/members/([^/]+)/verify$#', $endpoint, $m)) {
