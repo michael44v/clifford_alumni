@@ -13,6 +13,7 @@ export default function Gallery({ onNavigate }: GalleryProps) {
   const [albums, setAlbums] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedAlbum, setSelectedAlbum] = useState<any | null>(null);
+  const [viewingPhoto, setViewingPhoto] = useState<any | null>(null);
 
   // Upload modal state
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -20,6 +21,7 @@ export default function Gallery({ onNavigate }: GalleryProps) {
   const [uploadCategory, setUploadCategory] = useState("INDIVIDUAL_ALUMNI");
   const [selectedAlbumId, setSelectedAlbumId] = useState("");
   const [imageUrls, setImageUrls] = useState<string[]>([""]);
+  const [imageFiles, setImageFiles] = useState<(File | null)[]>([null]);
   const [captions, setCaptions] = useState<string[]>([""]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -62,41 +64,73 @@ export default function Gallery({ onNavigate }: GalleryProps) {
 
   const handleAddImageUrl = () => {
     setImageUrls([...imageUrls, ""]);
+    setImageFiles([...imageFiles, null]);
     setCaptions([...captions, ""]);
   };
 
   const handleRemoveImageUrl = (index: number) => {
     if (imageUrls.length <= 1) return;
     setImageUrls(imageUrls.filter((_, i) => i !== index));
+    setImageFiles(imageFiles.filter((_, i) => i !== index));
     setCaptions(captions.filter((_, i) => i !== index));
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    try {
-      const res = await uploadToCloudinary(file, "gallery");
+    const updatedFiles = [...imageFiles];
+    updatedFiles[index] = file;
+    setImageFiles(updatedFiles);
+
+    // Set temporary local preview URL
+    const reader = new FileReader();
+    reader.onloadend = () => {
       const updatedUrls = [...imageUrls];
-      updatedUrls[index] = res.url;
+      updatedUrls[index] = reader.result as string;
       setImageUrls(updatedUrls);
-    } catch (err) {
-      console.error("Upload failed", err);
-    }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validPhotos = imageUrls
-      .map((url, idx) => ({ url: url.trim(), caption: captions[idx] ? captions[idx].trim() : "" }))
-      .filter(p => p.url.length > 0);
+    const hasInputs = imageUrls.some((url) => url.trim().length > 0) || imageFiles.some((f) => f !== null);
 
-    if (validPhotos.length === 0) {
-      showToast("Please enter at least one photo URL or upload an image file.", "error");
+    if (!hasInputs) {
+      showToast("Please select at least one photo file or enter an image URL.", "error");
       return;
     }
 
     setIsSubmitting(true);
     try {
+      // 1. Upload files to Cloudinary sequentially and gather Cloudinary secure URLs
+      const validPhotos: { url: string; caption: string }[] = [];
+
+      for (let i = 0; i < imageUrls.length; i++) {
+        const file = imageFiles[i];
+        let url = imageUrls[i].trim();
+
+        if (file) {
+          showToast(`Uploading photo #${i + 1} to Cloudinary...`, "info");
+          const cloudinaryResult = await uploadToCloudinary(file, "gallery");
+          url = cloudinaryResult.url;
+        }
+
+        if (url && !url.startsWith("data:")) {
+          validPhotos.push({
+            url,
+            caption: captions[i] ? captions[i].trim() : "",
+          });
+        }
+      }
+
+      if (validPhotos.length === 0) {
+        showToast("No valid Cloudinary image URLs produced for upload.", "error");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 2. Send Cloudinary URLs to PHP backend to store in DB
       await apiFetch("/api/gallery/upload-multiple", {
         method: "POST",
         body: JSON.stringify({
@@ -218,22 +252,26 @@ export default function Gallery({ onNavigate }: GalleryProps) {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 py-2">
-              {(selectedAlbum.photos || []).map((p: any) => (
-                <div key={p.id} className="bg-slate-50 border border-[var(--border)] rounded-lg overflow-hidden flex flex-col">
-                  <div className="h-48 bg-[var(--muted)] overflow-hidden">
-                    <img src={p.media?.secureUrl} alt={p.caption || "Gallery photo"} className="w-full h-full object-cover" />
-                  </div>
-                  {p.caption && (
-                    <p className="p-2.5 text-xs text-[var(--foreground)] font-medium leading-snug">{p.caption}</p>
-                  )}
-                  {p.uploadedBy && (
-                    <div className="p-2 text-[10px] text-[var(--muted-foreground)] bg-slate-100 border-t border-[var(--border)] mt-auto flex justify-between items-center">
-                      <span>Uploaded by: <strong>{p.uploadedBy.firstName} {p.uploadedBy.lastName}</strong></span>
-                      <button onClick={() => handleDeleteAlbumPhoto(p.id)} className="text-red-600 hover:underline font-bold text-[10px]">Delete</button>
+              {(selectedAlbum.photos || []).map((p: any) => {
+                const photoSrc = p.photoUrl || p.media?.secureUrl;
+                return (
+                  <div key={p.id} className="bg-slate-50 border border-[var(--border)] rounded-lg overflow-hidden flex flex-col group cursor-pointer hover:border-[var(--primary)] transition-all">
+                    <div className="h-48 bg-[var(--muted)] overflow-hidden relative" onClick={() => setViewingPhoto(p)}>
+                      <img src={photoSrc} alt={p.caption || "Gallery photo"} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                        <span className="text-white text-2xl opacity-0 group-hover:opacity-100 transition-opacity">🔍</span>
+                      </div>
                     </div>
-                  )}
-                </div>
-              ))}
+                    {p.caption && (
+                      <p className="p-2.5 text-xs text-[var(--foreground)] font-medium leading-snug">{p.caption}</p>
+                    )}
+                    <div className="p-2 text-[10px] text-[var(--muted-foreground)] bg-slate-100 border-t border-[var(--border)] mt-auto flex justify-between items-center">
+                      <span>Uploaded by: <strong>{p.firstName ? `${p.firstName} ${p.lastName}` : (p.uploadedBy ? `${p.uploadedBy.firstName} ${p.uploadedBy.lastName}` : 'Alumni Member')}</strong></span>
+                      <button onClick={(e) => { e.stopPropagation(); handleDeleteAlbumPhoto(p.id); }} className="text-red-600 hover:underline font-bold text-[10px]">Delete</button>
+                    </div>
+                  </div>
+                );
+              })}
               {(selectedAlbum.photos || []).length === 0 && (
                 <p className="col-span-full text-center py-8 text-xs text-[var(--muted-foreground)]">No photos uploaded to this album yet.</p>
               )}
@@ -242,6 +280,19 @@ export default function Gallery({ onNavigate }: GalleryProps) {
             <div className="flex justify-end pt-2 border-t border-[var(--border)]">
               <button onClick={() => setSelectedAlbum(null)} className="px-5 py-2 bg-[var(--primary)] text-white rounded text-xs font-semibold">Close Album</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Photo Lightbox Modal */}
+      {viewingPhoto && (
+        <div className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center p-4" onClick={() => setViewingPhoto(null)}>
+          <div className="relative max-w-5xl w-full flex flex-col items-center" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setViewingPhoto(null)} className="absolute -top-10 right-0 text-white font-bold text-2xl hover:text-gray-300">✕ Close</button>
+            <img src={viewingPhoto.photoUrl || viewingPhoto.media?.secureUrl} alt={viewingPhoto.caption || "Full size photo"} className="max-h-[80vh] w-auto max-w-full rounded-lg shadow-2xl object-contain" />
+            {viewingPhoto.caption && (
+              <p className="mt-3 text-white text-sm bg-black/60 px-4 py-2 rounded max-w-xl text-center">{viewingPhoto.caption}</p>
+            )}
           </div>
         </div>
       )}
