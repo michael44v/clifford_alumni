@@ -2,8 +2,8 @@
 // backend/config/config.php
 
 $allowedOrigins = [
-    'https://vsafetyhub.com',
-    'https://www.vsafetyhub.com',
+    'https://clifforduniversityalumni.com',
+    'https://www.clifforduniversityalumni.com',
     'http://localhost:8443', // local dev
 ];
 

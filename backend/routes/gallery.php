@@ -18,38 +18,12 @@ function handleGalleryRoutes(string $endpoint, string $method): void {
     }
 
     if ($method === 'GET' && $endpoint === '/api/gallery/albums') {
-        $cat = $_GET['category'] ?? null;
-        $sql = "SELECT a.*, g.setName,
-                       (SELECT m.secureUrl FROM gallery_photos gp JOIN media m ON gp.mediaId = m.id WHERE gp.albumId = a.id ORDER BY gp.createdAt ASC LIMIT 1) as coverUrl,
-                       (SELECT COUNT(*) FROM gallery_photos gp WHERE gp.albumId = a.id) as photoCount
-                FROM gallery_albums a
-                LEFT JOIN graduating_sets g ON a.graduatingSetId = g.id";
-        $params = [];
-        if ($cat && $cat !== 'All') {
-            $sql .= " WHERE a.category = ?";
-            $params[] = $cat;
-        }
-        $sql .= " ORDER BY a.createdAt DESC";
-        jsonResponse(dbQuery($sql, $params));
-    }
-
-    if ($method === 'GET' && preg_match('#^/api/gallery/albums/([^/]+)$#', $endpoint, $m)) {
-        $albumId = $m[1];
-        $album = dbQueryOne("SELECT a.*, g.setName FROM gallery_albums a LEFT JOIN graduating_sets g ON a.graduatingSetId = g.id WHERE a.id = ?", [$albumId]);
-        if (!$album) jsonError("Album not found", 404);
-
-        $photos = dbQuery("SELECT p.*, m.secureUrl as photoUrl, mem.firstName, mem.lastName
-                          FROM gallery_photos p
-                          JOIN media m ON p.mediaId = m.id
-                          LEFT JOIN members mem ON p.uploadedById = mem.id
-                          WHERE p.albumId = ?
-                          ORDER BY p.createdAt ASC", [$albumId]);
-
-        $album['photos'] = $photos;
-        $album['coverUrl'] = !empty($photos[0]['photoUrl']) ? $photos[0]['photoUrl'] : null;
-        $album['photoCount'] = count($photos);
-
-        jsonResponse($album);
+        jsonResponse(dbQuery("SELECT a.*, g.setName,
+                              (SELECT m.secureUrl FROM gallery_photos gp JOIN media m ON gp.mediaId = m.id WHERE gp.albumId = a.id ORDER BY gp.createdAt ASC LIMIT 1) as coverUrl,
+                              (SELECT COUNT(*) FROM gallery_photos gp WHERE gp.albumId = a.id) as photoCount
+                              FROM gallery_albums a
+                              LEFT JOIN graduating_sets g ON a.graduatingSetId = g.id
+                              ORDER BY a.createdAt DESC"));
     }
 
     if ($method === 'GET' && $endpoint === '/api/gallery/photos') {

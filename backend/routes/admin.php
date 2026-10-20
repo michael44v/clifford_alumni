@@ -20,15 +20,7 @@ function handleAdminRoutes(string $endpoint, string $method): void {
     }
 
     if ($method === 'GET' && ($endpoint === '/api/admin/leadership' || $endpoint === '/api/members/leadership')) {
-        header('Cache-Control: public, max-age=60, stale-while-revalidate=300');
-        $data = cacheRemember('leadership:list', 300, function() {
-            return dbQuery("SELECT l.*, COALESCE(NULLIF(l.photoUrl, ''), med.secureUrl) as photoUrl, med.secureUrl as memberPhotoUrl
-                            FROM leadership_profiles l
-                            LEFT JOIN members m ON l.memberId = m.id
-                            LEFT JOIN media med ON m.profilePhotoMediaId = med.id
-                            ORDER BY l.orderIndex ASC, l.termStart DESC");
-        });
-        jsonResponse($data);
+        jsonResponse(dbQuery("SELECT * FROM leadership_profiles ORDER BY orderIndex ASC, termStart DESC"));
     }
 
     // Protected Admin Routes Require Auth
@@ -169,83 +161,33 @@ function handleAdminRoutes(string $endpoint, string $method): void {
     // MEMBERS ADMIN MANAGEMENT
     if ($method === 'GET' && $endpoint === '/api/admin/members') {
         requireRole($user, ['ADMIN', 'SUPER_ADMIN']);
-        $facultyId = $_GET['facultyId'] ?? null;
-        $setId = $_GET['setId'] ?? null;
-        $status = $_GET['status'] ?? null;
-        $search = $_GET['search'] ?? null;
-
-        $sql = "SELECT m.*, g.setName, f.name as facultyName
-                FROM members m
-                LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id
-                LEFT JOIN faculties f ON m.facultyId = f.id
-                WHERE m.role NOT IN ('ADMIN', 'SUPER_ADMIN')";
-        $params = [];
-
-        if ($facultyId) {
-            $sql .= " AND m.facultyId = ?";
-            $params[] = $facultyId;
-        }
-
-        if ($setId) {
-            $sql .= " AND m.graduatingSetId = ?";
-            $params[] = $setId;
-        }
-
-        if ($status) {
-            $sql .= " AND m.verificationStatus = ?";
-            $params[] = $status;
-        }
-
-        if ($search) {
-            $sql .= " AND (m.firstName LIKE ? OR m.lastName LIKE ? OR m.email LIKE ? OR m.department LIKE ?)";
-            $st = "%{$search}%";
-            $params = array_merge($params, [$st, $st, $st, $st]);
-        }
-
-        $sql .= " ORDER BY m.createdAt DESC";
-        $members = dbQuery($sql, $params);
-        if (is_array($members)) {
-            foreach ($members as &$mem) {
-                $mem['isFeatured'] = !empty($mem['isFeatured']) ? 1 : 0;
-                $mem['isAlumniOfWeek'] = !empty($mem['isAlumniOfWeek']) ? 1 : 0;
-            }
-        }
-        jsonResponse($members);
-    }
-
-    if ($method === 'PUT' && preg_match('#^/api/admin/members/([^/]+)$#', $endpoint, $m)) {
-        requireRole($user, ['ADMIN', 'SUPER_ADMIN']);
-        $body = getRequestBody();
-        $status = trim($body['verificationStatus'] ?? $body['status'] ?? '');
-        if ($status) {
-            dbQuery("UPDATE members SET verificationStatus = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?", [$status, $m[1]]);
-        }
-        jsonResponse(['message' => 'Member updated successfully']);
+        jsonResponse(dbQuery("SELECT m.*, g.setName, f.name as facultyName
+                              FROM members m
+                              LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id
+                              LEFT JOIN faculties f ON m.facultyId = f.id
+                              WHERE m.role NOT IN ('ADMIN', 'SUPER_ADMIN')
+                              ORDER BY m.createdAt DESC"));
     }
 
     if ($method === 'GET' && preg_match('#^/api/admin/members/([^/]+)/details$#', $endpoint, $m)) {
         requireRole($user, ['ADMIN', 'SUPER_ADMIN']);
         $memberId = $m[1];
 
-        $memberInfo = dbQueryOne("SELECT m.*, g.setName, g.graduationYear, f.name as facultyName, med.secureUrl as photoUrl, med.secureUrl as profilePhotoUrl
+        $memberInfo = dbQueryOne("SELECT m.*, g.setName, f.name as facultyName
                                 FROM members m
                                 LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id
                                 LEFT JOIN faculties f ON m.facultyId = f.id
-                                LEFT JOIN media med ON m.profilePhotoMediaId = med.id
                                 WHERE m.id = ?", [$memberId]);
         if (!$memberInfo) jsonError("Member not found", 404);
 
-        $galleryPhotos = dbQuery("SELECT p.*, m.secureUrl as photoUrl FROM gallery_photos p JOIN media m ON p.mediaId = m.id WHERE p.uploadedById = ? ORDER BY p.createdAt DESC", [$memberId]);
         $payments = dbQuery("SELECT p.*, d.title as duesTitle FROM payment_records p LEFT JOIN dues_items d ON p.duesItemId = d.id WHERE p.memberId = ? ORDER BY p.createdAt DESC", [$memberId]);
         $welfare = dbQuery("SELECT * FROM welfare_requests WHERE memberId = ? ORDER BY createdAt DESC", [$memberId]);
 
-        $memberInfo['graduatingSet'] = ['setName' => $memberInfo['setName'] ?? null, 'graduationYear' => $memberInfo['graduationYear'] ?? null];
-        $memberInfo['faculty'] = ['name' => $memberInfo['facultyName'] ?? null];
-        $memberInfo['galleryPhotosUploaded'] = $galleryPhotos;
-        $memberInfo['paymentRecords'] = $payments;
-        $memberInfo['welfareRequests'] = $welfare;
-
-        jsonResponse($memberInfo);
+        jsonResponse([
+            'member' => $memberInfo,
+            'payments' => $payments,
+            'welfareRequests' => $welfare
+        ]);
     }
 
     if ($method === 'PUT' && preg_match('#^/api/admin/members/([^/]+)/verify$#', $endpoint, $m)) {
@@ -263,28 +205,24 @@ function handleAdminRoutes(string $endpoint, string $method): void {
     if ($method === 'PUT' && preg_match('#^/api/admin/members/([^/]+)/alumni-of-the-week$#', $endpoint, $m)) {
         requireRole($user, ['ADMIN', 'SUPER_ADMIN']);
         $body = getRequestBody();
-        $val = $body['isAlumniOfWeek'] ?? null;
-        $isAlumniOfWeek = ($val === true || $val === 'true' || $val === 1 || $val === '1') ? 1 : 0;
-        $bio = trim($body['alumniOfWeekBio'] ?? $body['bio'] ?? '');
+        $isAlumniOfWeek = !empty($body['isAlumniOfWeek']) ? 1 : 0;
+        $bio = trim($body['bio'] ?? '');
 
-        if ($isAlumniOfWeek === 1) {
+        if ($isAlumniOfWeek) {
             dbQuery("UPDATE members SET isAlumniOfWeek = 0");
         }
 
         dbQuery("UPDATE members SET isAlumniOfWeek = ?, alumniOfWeekBio = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?", [$isAlumniOfWeek, $bio, $m[1]]);
-        cacheForget('members:alumni-of-the-week');
-        jsonResponse(['message' => 'Alumni of the week updated successfully', 'isAlumniOfWeek' => $isAlumniOfWeek]);
+        jsonResponse(['message' => 'Alumni of the week updated successfully']);
     }
 
     if ($method === 'PUT' && preg_match('#^/api/admin/members/([^/]+)/featured$#', $endpoint, $m)) {
         requireRole($user, ['ADMIN', 'SUPER_ADMIN']);
         $body = getRequestBody();
-        $val = $body['isFeatured'] ?? null;
-        $isFeatured = ($val === true || $val === 'true' || $val === 1 || $val === '1') ? 1 : 0;
+        $isFeatured = !empty($body['isFeatured']) ? 1 : 0;
 
         dbQuery("UPDATE members SET isFeatured = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?", [$isFeatured, $m[1]]);
-        cacheForget('members:featured');
-        jsonResponse(['message' => 'Member featured status updated successfully', 'isFeatured' => $isFeatured]);
+        jsonResponse(['message' => 'Member featured status updated successfully']);
     }
 
     // LEADERSHIP / EXCOS MANAGEMENT
@@ -309,7 +247,6 @@ function handleAdminRoutes(string $endpoint, string $method): void {
             dbQuery("UPDATE members SET role = 'EXCO_ADMIN' WHERE id = ?", [$memberId]);
         }
 
-        cacheForget('leadership:list');
         jsonResponse(dbQueryOne("SELECT * FROM leadership_profiles WHERE id = ?", [$newId]), 201);
     }
 
@@ -336,14 +273,12 @@ function handleAdminRoutes(string $endpoint, string $method): void {
 
         dbQuery("UPDATE leadership_profiles SET name = ?, position = ?, biography = ?, photoUrl = ?, termStart = ?, termEnd = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?", [$updName, $updPos, $updBio, $updPhoto ?: null, $updStart, $updEnd, $leadId]);
 
-        cacheForget('leadership:list');
         jsonResponse(dbQueryOne("SELECT * FROM leadership_profiles WHERE id = ?", [$leadId]));
     }
 
     if ($method === 'DELETE' && preg_match('#^/api/admin/leadership/([^/]+)$#', $endpoint, $m)) {
         requireRole($user, ['ADMIN', 'SUPER_ADMIN']);
         dbQuery("DELETE FROM leadership_profiles WHERE id = ?", [$m[1]]);
-        cacheForget('leadership:list');
         jsonResponse(['message' => 'Leadership profile deleted successfully']);
     }
 
@@ -358,7 +293,6 @@ function handleAdminRoutes(string $endpoint, string $method): void {
 
         dbQuery("UPDATE impact_stats SET activeMembers = ?, totalDonations = ?, projectsFunded = ?, countriesCount = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = 'default-impact-stats'", [$activeMembers, $totalDonations, $projectsFunded, $countriesCount]);
 
-        cacheForget('finance:impact-stats');
         jsonResponse(dbQueryOne("SELECT * FROM impact_stats WHERE id = 'default-impact-stats'"));
     }
 }
