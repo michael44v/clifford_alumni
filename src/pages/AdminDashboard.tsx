@@ -30,6 +30,8 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [scholarshipsForm, setScholarshipsForm] = useState("");
   const [loading, setLoading] = useState(false);
   const [selectedMemberDetail, setSelectedMemberDetail] = useState<any | null>(null);
+  const [fetchingMemberId, setFetchingMemberId] = useState<string | null>(null);
+  const [isLoadingMemberDetail, setIsLoadingMemberDetail] = useState(false);
 
   // Search/Filters
   const [memberSearch, setMemberSearch] = useState("");
@@ -67,9 +69,11 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [adminUploadCategory, setAdminUploadCategory] = useState("ALUMNI_EVENT");
   const [adminSelectedAlbumId, setAdminSelectedAlbumId] = useState("");
   const [adminImageUrls, setAdminImageUrls] = useState<string[]>([""]);
+  const [adminImageFiles, setAdminImageFiles] = useState<(File | null)[]>([null]);
   const [adminCaptions, setAdminCaptions] = useState<string[]>([""]);
   const [adminSetLandingPage, setAdminSetLandingPage] = useState(true);
   const [isAdminSubmitting, setIsAdminSubmitting] = useState(false);
+  const [mediaFilter, setMediaFilter] = useState<"ALL" | "ALUMNI" | "FEATURED">("ALL");
 
   // Forms
   const [facultyForm, setFacultyForm] = useState({ name: "", code: "" });
@@ -180,11 +184,16 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   };
 
   const handleFetchMemberDetails = async (id: string) => {
+    setFetchingMemberId(id);
+    setIsLoadingMemberDetail(true);
     try {
       const data = await apiFetch(`/api/admin/members/${id}/details`);
       setSelectedMemberDetail(data);
     } catch (err: any) {
       showToast(err.message || "Failed to fetch member details", "error");
+    } finally {
+      setFetchingMemberId(null);
+      setIsLoadingMemberDetail(false);
     }
   };
 
@@ -239,21 +248,42 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
 
   const handleAdminUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validPhotos = adminImageUrls
-      .map((url, idx) => ({
-        url: url.trim(),
-        caption: adminCaptions[idx] ? adminCaptions[idx].trim() : "",
-        isFeatured: adminSetLandingPage,
-      }))
-      .filter(p => p.url.length > 0);
+    const hasInputs = adminImageUrls.some(u => u.trim().length > 0) || adminImageFiles.some(f => f !== null);
 
-    if (validPhotos.length === 0) {
-      showToast("Please enter at least one photo URL or upload an image file.", "error");
+    if (!hasInputs) {
+      showToast("Please select at least one photo file or enter an image URL.", "error");
       return;
     }
 
     setIsAdminSubmitting(true);
     try {
+      const validPhotos: { url: string; caption: string; isFeatured: boolean }[] = [];
+
+      for (let i = 0; i < adminImageUrls.length; i++) {
+        const file = adminImageFiles[i];
+        let url = adminImageUrls[i].trim();
+
+        if (file) {
+          showToast(`Uploading photo #${i + 1} to Cloudinary...`, "info");
+          const cloudinaryResult = await uploadToCloudinary(file, "gallery");
+          url = cloudinaryResult.url;
+        }
+
+        if (url && !url.startsWith("data:")) {
+          validPhotos.push({
+            url,
+            caption: adminCaptions[i] ? adminCaptions[i].trim() : "",
+            isFeatured: adminSetLandingPage,
+          });
+        }
+      }
+
+      if (validPhotos.length === 0) {
+        showToast("No valid image files or URLs provided.", "error");
+        setIsAdminSubmitting(false);
+        return;
+      }
+
       await apiFetch("/api/gallery/upload-multiple", {
         method: "POST",
         body: JSON.stringify({
@@ -269,6 +299,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       setShowAdminUploadModal(false);
       setAdminUploadAlbumTitle("");
       setAdminImageUrls([""]);
+      setAdminImageFiles([null]);
       setAdminCaptions([""]);
       fetchData();
     } catch (err: any) {
@@ -326,9 +357,25 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       if (showWelfareModal && showWelfareModal.id === id) {
         setShowWelfareModal({ ...showWelfareModal, status });
       }
+      showToast("Welfare request status updated!", "success");
       fetchData();
     } catch (err: any) {
       showToast(err.message || "Failed to update welfare case status", "error");
+    }
+  };
+
+  const handleDeleteWelfareRequest = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this welfare request?")) return;
+    try {
+      await apiFetch(`/api/welfare/admin/cases/${id}`, { method: "DELETE" });
+      showToast("Welfare request deleted successfully.", "success");
+      setWelfareCases(prev => prev.filter(w => w.id !== id));
+      if (showWelfareModal && showWelfareModal.id === id) {
+        setShowWelfareModal(null);
+      }
+      fetchData();
+    } catch (err: any) {
+      showToast(err.message || "Failed to delete welfare request", "error");
     }
   };
 
@@ -1006,7 +1053,20 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                       </td>
                       <td className="p-3" onClick={e => e.stopPropagation()}>
                         <div className="flex gap-1">
-                          <button onClick={() => handleFetchMemberDetails(m.id)} className="px-2.5 py-1 bg-[var(--primary)] text-white rounded text-[10px] font-semibold">View Details</button>
+                          <button
+                            onClick={() => handleFetchMemberDetails(m.id)}
+                            disabled={fetchingMemberId === m.id}
+                            className="px-2.5 py-1 bg-[var(--primary)] text-white rounded text-[10px] font-semibold flex items-center gap-1 hover:bg-[var(--accent)] transition-colors disabled:opacity-70"
+                          >
+                            {fetchingMemberId === m.id ? (
+                              <>
+                                <span className="animate-spin inline-block h-2.5 w-2.5 border-2 border-white border-t-transparent rounded-full" />
+                                Loading...
+                              </>
+                            ) : (
+                              "View Details"
+                            )}
+                          </button>
                           {m.verificationStatus !== "VERIFIED" && (
                             <button onClick={() => updateMemberStatus(m.id, "VERIFIED")} className="px-2 py-1 bg-green-600 text-white rounded text-[10px] font-semibold hover:bg-green-700">Approve</button>
                           )}
@@ -1031,7 +1091,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
         {/* Media Tab */}
         {!loading && activeTab === "media" && (
           <div className="bg-white border border-[var(--border)] rounded overflow-hidden p-5">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3 border-b border-[var(--border)] pb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 border-b border-[var(--border)] pb-4">
               <div>
                 <h3 className="font-bold text-base text-[var(--secondary)]">Uploaded Photos Media Manager</h3>
                 <p className="text-xs text-[var(--muted-foreground)]">
@@ -1051,14 +1111,32 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
               </div>
             </div>
 
+            {/* Media Filter Tabs */}
+            <div className="flex gap-2 mb-6">
+              <button onClick={() => setMediaFilter("ALL")} className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${mediaFilter === "ALL" ? "bg-[var(--secondary)] text-white" : "bg-slate-100 text-[var(--muted-foreground)] hover:bg-slate-200"}`}>All Photos ({galleryPhotos.length})</button>
+              <button onClick={() => setMediaFilter("ALUMNI")} className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${mediaFilter === "ALUMNI" ? "bg-blue-600 text-white" : "bg-slate-100 text-[var(--muted-foreground)] hover:bg-slate-200"}`}>👤 Alumni Uploads ({galleryPhotos.filter(p => p.uploadedBy || p.uploadedById).length})</button>
+              <button onClick={() => setMediaFilter("FEATURED")} className={`px-3 py-1.5 rounded text-xs font-bold transition-colors ${mediaFilter === "FEATURED" ? "bg-amber-600 text-white" : "bg-slate-100 text-[var(--muted-foreground)] hover:bg-slate-200"}`}>🌟 Showcase Featured ({galleryPhotos.filter(p => p.isFeatured).length})</button>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {galleryPhotos.map((photo) => (
+              {galleryPhotos
+                .filter(p => {
+                  if (mediaFilter === "ALUMNI") return Boolean(p.uploadedBy || p.uploadedById);
+                  if (mediaFilter === "FEATURED") return Boolean(p.isFeatured);
+                  return true;
+                })
+                .map((photo) => (
                 <div key={photo.id} className="border border-[var(--border)] rounded-lg overflow-hidden bg-slate-50 flex flex-col hover:shadow-md transition-shadow">
                   <div className="h-44 bg-[var(--muted)] relative overflow-hidden">
                     <img src={photo.photoUrl || photo.media?.secureUrl || photo.media?.url} alt={photo.caption || "Showcase photo"} className="w-full h-full object-cover" />
                     {photo.isFeatured && (
                       <span className="absolute top-2 right-2 px-2 py-0.5 bg-amber-500 text-white font-bold text-[10px] rounded shadow uppercase tracking-wide">
-                        🌟 Landing Page Featured
+                        🌟 Featured
+                      </span>
+                    )}
+                    {(photo.uploadedBy || photo.uploadedById) && (
+                      <span className="absolute top-2 left-2 px-2 py-0.5 bg-blue-600 text-white font-bold text-[10px] rounded shadow uppercase tracking-wide">
+                        👤 Alumni Upload
                       </span>
                     )}
                   </div>
@@ -1152,7 +1230,10 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">{w.status}</span>
                       </td>
                       <td className="p-3" onClick={e => e.stopPropagation()}>
-                        <button onClick={() => setShowWelfareModal(w)} className="px-2 py-1 bg-[var(--primary)] text-white rounded text-[10px] font-semibold">View Details</button>
+                        <div className="flex gap-1">
+                          <button onClick={() => setShowWelfareModal(w)} className="px-2 py-1 bg-[var(--primary)] text-white rounded text-[10px] font-semibold">View Details</button>
+                          <button onClick={() => handleDeleteWelfareRequest(w.id)} className="px-2 py-1 bg-red-100 text-red-700 rounded text-[10px] font-semibold hover:bg-red-200">Delete</button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1658,17 +1739,20 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                           <input
                             type="file"
                             accept="image/*"
-                            onChange={async e => {
+                            onChange={e => {
                               const file = e.target.files?.[0];
                               if (file) {
-                                try {
-                                  const res = await uploadToCloudinary(file, "gallery");
+                                const newFiles = [...adminImageFiles];
+                                newFiles[idx] = file;
+                                setAdminImageFiles(newFiles);
+
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
                                   const newUrls = [...adminImageUrls];
-                                  newUrls[idx] = res.url;
+                                  newUrls[idx] = reader.result as string;
                                   setAdminImageUrls(newUrls);
-                                } catch (err) {
-                                  console.error("Upload failed", err);
-                                }
+                                };
+                                reader.readAsDataURL(file);
                               }
                             }}
                             className="w-full text-[11px] bg-white border rounded p-1"
@@ -1718,6 +1802,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                   type="button"
                   onClick={() => {
                     setAdminImageUrls([...adminImageUrls, ""]);
+                    setAdminImageFiles([...adminImageFiles, null]);
                     setAdminCaptions([...adminCaptions, ""]);
                   }}
                   className="mt-3 px-4 py-2 bg-white border border-[var(--primary)] text-[var(--primary)] rounded text-xs font-semibold hover:bg-[var(--primary)] hover:text-white transition-colors"
@@ -1729,7 +1814,7 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
               <div className="flex gap-2 justify-end pt-3 border-t border-[var(--border)]">
                 <button type="button" onClick={() => setShowAdminUploadModal(false)} className="px-4 py-2 border rounded font-medium">Cancel</button>
                 <button type="submit" disabled={isAdminSubmitting} className="px-6 py-2 bg-[var(--primary)] text-white rounded font-bold hover:bg-[var(--accent)] transition-colors">
-                  {isAdminSubmitting ? "Uploading..." : `Upload & Save ${adminImageUrls.filter(Boolean).length} Photo(s)`}
+                  {isAdminSubmitting ? "Uploading..." : `Upload & Save ${adminImageUrls.filter(u => u.trim().length > 0).length} Photo(s)`}
                 </button>
               </div>
             </form>
@@ -1738,80 +1823,89 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       )}
 
       {/* Detailed Member Profile Modal */}
-      {selectedMemberDetail && (
+      {(selectedMemberDetail || isLoadingMemberDetail) && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setSelectedMemberDetail(null)}>
           <div className="bg-white rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl space-y-5" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-start border-b border-[var(--border)] pb-4">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[var(--primary)] bg-[var(--muted)] flex-shrink-0">
-                  <img src={selectedMemberDetail.profilePhotoUrl || selectedMemberDetail.profilePhoto?.secureUrl || "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg"} alt={selectedMemberDetail.firstName} className="w-full h-full object-cover" />
+            {isLoadingMemberDetail ? (
+              <div className="py-16 text-center space-y-3">
+                <div className="animate-spin inline-block w-10 h-10 border-4 border-[var(--primary)] border-t-transparent rounded-full mx-auto" />
+                <p className="text-sm font-semibold text-[var(--foreground)]">Loading member profile from database...</p>
+              </div>
+            ) : selectedMemberDetail && (
+              <>
+                <div className="flex justify-between items-start border-b border-[var(--border)] pb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-[var(--primary)] bg-[var(--muted)] flex-shrink-0">
+                      <img src={selectedMemberDetail.profilePhotoUrl || selectedMemberDetail.profilePhoto?.secureUrl || "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg"} alt={selectedMemberDetail.firstName} className="w-full h-full object-cover" />
+                    </div>
+                    <div>
+                      <h2 className="font-display text-xl font-bold text-[var(--secondary)]">{selectedMemberDetail.firstName} {selectedMemberDetail.lastName}</h2>
+                      <p className="text-xs text-[var(--muted-foreground)]">{selectedMemberDetail.email} · {selectedMemberDetail.phone || 'No phone'}</p>
+                      <div className="flex gap-2 mt-1.5 items-center">
+                        <span className="font-mono text-[11px] font-bold text-[var(--primary)] bg-[var(--muted)] px-2 py-0.5 rounded">
+                          Matric: {selectedMemberDetail.matricNumber || 'N/A'}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${selectedMemberDetail.verificationStatus === "VERIFIED" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                          {selectedMemberDetail.verificationStatus}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <button onClick={() => setSelectedMemberDetail(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl">✕</button>
                 </div>
-                <div>
-                  <h2 className="font-display text-xl font-bold text-[var(--secondary)]">{selectedMemberDetail.firstName} {selectedMemberDetail.lastName}</h2>
-                  <p className="text-xs text-[var(--muted-foreground)]">{selectedMemberDetail.email} · {selectedMemberDetail.phone || 'No phone'}</p>
-                  <div className="flex gap-2 mt-1.5 items-center">
-                    <span className="font-mono text-[11px] font-bold text-[var(--primary)] bg-[var(--muted)] px-2 py-0.5 rounded">
-                      Matric: {selectedMemberDetail.matricNumber || 'N/A'}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${selectedMemberDetail.verificationStatus === "VERIFIED" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
-                      {selectedMemberDetail.verificationStatus}
-                    </span>
+
+                {/* Quick Actions Bar */}
+                <div className="flex items-center justify-between bg-[var(--muted)] p-3 rounded text-xs">
+                  <span className="font-semibold text-[var(--foreground)]">Admin Actions for Member:</span>
+                  <div className="flex gap-2">
+                    {selectedMemberDetail.verificationStatus !== "VERIFIED" && (
+                      <button onClick={() => updateMemberStatus(selectedMemberDetail.id, "VERIFIED")} className="px-3 py-1 bg-green-600 text-white rounded font-bold hover:bg-green-700">
+                        Approve Member
+                      </button>
+                    )}
+                    {selectedMemberDetail.verificationStatus !== "SUSPENDED" && (
+                      <button onClick={() => updateMemberStatus(selectedMemberDetail.id, "SUSPENDED")} className="px-3 py-1 bg-red-600 text-white rounded font-bold hover:bg-red-700">
+                        Suspend Member
+                      </button>
+                    )}
                   </div>
                 </div>
-              </div>
-              <button onClick={() => setSelectedMemberDetail(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl">✕</button>
-            </div>
 
-            {/* Quick Actions Bar */}
-            <div className="flex items-center justify-between bg-[var(--muted)] p-3 rounded text-xs">
-              <span className="font-semibold text-[var(--foreground)]">Admin Actions for Member:</span>
-              <div className="flex gap-2">
-                {selectedMemberDetail.verificationStatus !== "VERIFIED" && (
-                  <button onClick={() => updateMemberStatus(selectedMemberDetail.id, "VERIFIED")} className="px-3 py-1 bg-green-600 text-white rounded font-bold hover:bg-green-700">
-                    Approve Member
-                  </button>
-                )}
-                {selectedMemberDetail.verificationStatus !== "SUSPENDED" && (
-                  <button onClick={() => updateMemberStatus(selectedMemberDetail.id, "SUSPENDED")} className="px-3 py-1 bg-red-600 text-white rounded font-bold hover:bg-red-700">
-                    Suspend Member
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* General Info Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs bg-slate-50 p-4 border border-[var(--border)] rounded-lg">
-              <div>
-                <p className="text-[var(--muted-foreground)] text-[10px]">Graduating Set</p>
-                <p className="font-bold">{selectedMemberDetail.graduatingSet?.setName || 'N/A'} ({selectedMemberDetail.graduatingSet?.graduationYear || ''})</p>
-              </div>
-              <div>
-                <p className="text-[var(--muted-foreground)] text-[10px]">Faculty & Department</p>
-                <p className="font-bold">{selectedMemberDetail.faculty?.name || 'N/A'} - {selectedMemberDetail.department || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-[var(--muted-foreground)] text-[10px]">Profession / Company</p>
-                <p className="font-bold">{selectedMemberDetail.profession || 'N/A'} {selectedMemberDetail.company ? `@ ${selectedMemberDetail.company}` : ''}</p>
-              </div>
-              <div>
-                <p className="text-[var(--muted-foreground)] text-[10px]">Location</p>
-                <p className="font-bold">{selectedMemberDetail.location?.state || selectedMemberDetail.diasporaCountry || 'N/A'}</p>
-              </div>
-              <div>
-                <p className="text-[var(--muted-foreground)] text-[10px]">Account Role</p>
-                <p className="font-bold text-[var(--primary)]">{selectedMemberDetail.role}</p>
-              </div>
-              <div>
-                <p className="text-[var(--muted-foreground)] text-[10px]">Member Type</p>
-                <p className="font-bold">{selectedMemberDetail.memberType}</p>
-              </div>
-              {selectedMemberDetail.bio && (
-                <div className="col-span-full pt-2 border-t border-[var(--border)]">
-                  <p className="text-[var(--muted-foreground)] text-[10px]">Short Bio</p>
-                  <p className="italic text-[var(--foreground)] mt-0.5">{selectedMemberDetail.bio}</p>
+                {/* General Info Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs bg-slate-50 p-4 border border-[var(--border)] rounded-lg">
+                  <div>
+                    <p className="text-[var(--muted-foreground)] text-[10px]">Graduating Set</p>
+                    <p className="font-bold">{selectedMemberDetail.setName || selectedMemberDetail.graduatingSet?.setName || 'N/A'} {selectedMemberDetail.graduationYear || selectedMemberDetail.graduatingSet?.graduationYear ? `(${selectedMemberDetail.graduationYear || selectedMemberDetail.graduatingSet?.graduationYear})` : ''}</p>
+                  </div>
+                  <div>
+                    <p className="text-[var(--muted-foreground)] text-[10px]">Faculty & Department</p>
+                    <p className="font-bold">{selectedMemberDetail.facultyName || selectedMemberDetail.faculty?.name || 'N/A'} - {selectedMemberDetail.department || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[var(--muted-foreground)] text-[10px]">Profession / Company</p>
+                    <p className="font-bold">{selectedMemberDetail.profession || 'N/A'} {selectedMemberDetail.company ? `@ ${selectedMemberDetail.company}` : ''}</p>
+                  </div>
+                  <div>
+                    <p className="text-[var(--muted-foreground)] text-[10px]">Location</p>
+                    <p className="font-bold">{selectedMemberDetail.state || selectedMemberDetail.location?.state || selectedMemberDetail.diasporaCountry || selectedMemberDetail.country || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[var(--muted-foreground)] text-[10px]">Account Role</p>
+                    <p className="font-bold text-[var(--primary)]">{selectedMemberDetail.role || 'MEMBER'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[var(--muted-foreground)] text-[10px]">Member Type</p>
+                    <p className="font-bold">{selectedMemberDetail.memberType || 'ALUMNI'}</p>
+                  </div>
+                  {selectedMemberDetail.bio && (
+                    <div className="col-span-full pt-2 border-t border-[var(--border)]">
+                      <p className="text-[var(--muted-foreground)] text-[10px]">Short Bio</p>
+                      <p className="italic text-[var(--foreground)] mt-0.5">{selectedMemberDetail.bio}</p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
 
             {/* Uploaded Gallery Photos */}
             <div>
@@ -2162,7 +2256,10 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                   <option value="REJECTED">REJECTED</option>
                 </select>
               </div>
-              <button onClick={() => setShowWelfareModal(null)} className="px-4 py-1.5 bg-[var(--primary)] text-white rounded text-xs font-semibold">Close</button>
+              <div className="flex gap-2">
+                <button onClick={() => handleDeleteWelfareRequest(showWelfareModal.id)} className="px-3 py-1.5 bg-red-100 text-red-700 rounded text-xs font-semibold hover:bg-red-200">Delete Request</button>
+                <button onClick={() => setShowWelfareModal(null)} className="px-4 py-1.5 bg-[var(--primary)] text-white rounded text-xs font-semibold">Close</button>
+              </div>
             </div>
           </div>
         </div>

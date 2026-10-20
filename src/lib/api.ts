@@ -99,6 +99,27 @@ export async function uploadToCloudinary(file: File, folder: string = "alumni/up
   });
 
   if (!cloudinaryRes.ok) {
+    // Fallback to unsigned upload if signature fails
+    if (sigData.uploadPreset) {
+      const fallbackData = new FormData();
+      fallbackData.append("file", file);
+      fallbackData.append("upload_preset", sigData.uploadPreset);
+      fallbackData.append("folder", sigData.folder);
+
+      const fallbackRes = await fetch(`https://api.cloudinary.com/v1_1/${sigData.cloudName}/image/upload`, {
+        method: "POST",
+        body: fallbackData,
+      });
+
+      if (fallbackRes.ok) {
+        const result = await fallbackRes.json();
+        return {
+          url: result.secure_url,
+          publicId: result.public_id,
+        };
+      }
+    }
+
     const errJson = await cloudinaryRes.json().catch(() => ({}));
     throw new Error(errJson?.error?.message || "Cloudinary direct upload failed");
   }
