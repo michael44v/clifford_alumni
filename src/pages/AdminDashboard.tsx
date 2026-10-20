@@ -1904,82 +1904,82 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                     </div>
                   )}
                 </div>
+
+                {/* Uploaded Gallery Photos */}
+                <div>
+                  <h3 className="font-bold text-sm text-[var(--secondary)] mb-2">Uploaded Gallery Photos ({(selectedMemberDetail.galleryPhotosUploaded || []).length})</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {(selectedMemberDetail.galleryPhotosUploaded || []).map((p: any) => (
+                      <div key={p.id} className="h-28 rounded border border-[var(--border)] overflow-hidden relative bg-[var(--muted)]">
+                        <img src={p.photoUrl || p.media?.secureUrl} alt={p.caption || "Photo"} className="w-full h-full object-cover" />
+                        {p.isFeatured && (
+                          <span className="absolute top-1 left-1 px-1 bg-amber-500 text-white text-[9px] font-bold rounded">Featured</span>
+                        )}
+                      </div>
+                    ))}
+                    {(selectedMemberDetail.galleryPhotosUploaded || []).length === 0 && (
+                      <p className="col-span-full text-xs text-[var(--muted-foreground)] py-2">No photos uploaded by this member.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Payment Records */}
+                <div>
+                  <h3 className="font-bold text-sm text-[var(--secondary)] mb-2">Payment Records ({(selectedMemberDetail.paymentRecords || []).length})</h3>
+                  <div className="overflow-x-auto border border-[var(--border)] rounded">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
+                          <th className="p-2 text-[var(--muted-foreground)] font-medium">Item / Campaign</th>
+                          <th className="p-2 text-[var(--muted-foreground)] font-medium">Amount</th>
+                          <th className="p-2 text-[var(--muted-foreground)] font-medium">Status</th>
+                          <th className="p-2 text-[var(--muted-foreground)] font-medium">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border)]">
+                        {(selectedMemberDetail.paymentRecords || []).map((p: any) => (
+                          <tr key={p.id}>
+                            <td className="p-2 font-medium">{p.duesItem?.title || p.donationCampaign?.title || 'Dues/Donation'}</td>
+                            <td className="p-2 font-bold text-green-600">₦{Number(p.amount).toLocaleString()}</td>
+                            <td className="p-2"><span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded">{p.status}</span></td>
+                            <td className="p-2 text-[var(--muted-foreground)]">{new Date(p.createdAt).toLocaleDateString()}</td>
+                          </tr>
+                        ))}
+                        {(selectedMemberDetail.paymentRecords || []).length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="p-3 text-center text-xs text-[var(--muted-foreground)]">No payments recorded.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Welfare Cases */}
+                <div>
+                  <h3 className="font-bold text-sm text-[var(--secondary)] mb-2">Welfare Requests ({(selectedMemberDetail.welfareRequests || []).length})</h3>
+                  <div className="space-y-2">
+                    {(selectedMemberDetail.welfareRequests || []).map((w: any) => (
+                      <div key={w.id} className="p-3 border border-[var(--border)] rounded bg-slate-50 text-xs">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-bold text-[var(--primary)]">{w.category}</span>
+                          <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded">{w.status}</span>
+                        </div>
+                        <p className="text-[var(--muted-foreground)] leading-relaxed">{w.description}</p>
+                        <p className="text-[10px] text-[var(--muted-foreground)] mt-1">{new Date(w.createdAt).toLocaleString()}</p>
+                      </div>
+                    ))}
+                    {(selectedMemberDetail.welfareRequests || []).length === 0 && (
+                      <p className="text-xs text-[var(--muted-foreground)] py-1">No welfare cases submitted.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2 border-t border-[var(--border)]">
+                  <button onClick={() => setSelectedMemberDetail(null)} className="px-5 py-2 bg-[var(--primary)] text-white rounded text-xs font-semibold">Close Profile</button>
+                </div>
               </>
             )}
-
-            {/* Uploaded Gallery Photos */}
-            <div>
-              <h3 className="font-bold text-sm text-[var(--secondary)] mb-2">Uploaded Gallery Photos ({(selectedMemberDetail.galleryPhotosUploaded || []).length})</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {(selectedMemberDetail.galleryPhotosUploaded || []).map((p: any) => (
-                  <div key={p.id} className="h-28 rounded border border-[var(--border)] overflow-hidden relative bg-[var(--muted)]">
-                    <img src={p.media?.secureUrl} alt={p.caption || "Photo"} className="w-full h-full object-cover" />
-                    {p.isFeatured && (
-                      <span className="absolute top-1 left-1 px-1 bg-amber-500 text-white text-[9px] font-bold rounded">Featured</span>
-                    )}
-                  </div>
-                ))}
-                {(selectedMemberDetail.galleryPhotosUploaded || []).length === 0 && (
-                  <p className="col-span-full text-xs text-[var(--muted-foreground)] py-2">No photos uploaded by this member.</p>
-                )}
-              </div>
-            </div>
-
-            {/* Payment Records */}
-            <div>
-              <h3 className="font-bold text-sm text-[var(--secondary)] mb-2">Payment Records ({(selectedMemberDetail.paymentRecords || []).length})</h3>
-              <div className="overflow-x-auto border border-[var(--border)] rounded">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-[var(--muted)] border-b border-[var(--border)]">
-                      <th className="p-2 text-[var(--muted-foreground)] font-medium">Item / Campaign</th>
-                      <th className="p-2 text-[var(--muted-foreground)] font-medium">Amount</th>
-                      <th className="p-2 text-[var(--muted-foreground)] font-medium">Status</th>
-                      <th className="p-2 text-[var(--muted-foreground)] font-medium">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--border)]">
-                    {(selectedMemberDetail.paymentRecords || []).map((p: any) => (
-                      <tr key={p.id}>
-                        <td className="p-2 font-medium">{p.duesItem?.title || p.donationCampaign?.title || 'Dues/Donation'}</td>
-                        <td className="p-2 font-bold text-green-600">₦{Number(p.amount).toLocaleString()}</td>
-                        <td className="p-2"><span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded">{p.status}</span></td>
-                        <td className="p-2 text-[var(--muted-foreground)]">{new Date(p.createdAt).toLocaleDateString()}</td>
-                      </tr>
-                    ))}
-                    {(selectedMemberDetail.paymentRecords || []).length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="p-3 text-center text-xs text-[var(--muted-foreground)]">No payments recorded.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Welfare Cases */}
-            <div>
-              <h3 className="font-bold text-sm text-[var(--secondary)] mb-2">Welfare Requests ({(selectedMemberDetail.welfareRequests || []).length})</h3>
-              <div className="space-y-2">
-                {(selectedMemberDetail.welfareRequests || []).map((w: any) => (
-                  <div key={w.id} className="p-3 border border-[var(--border)] rounded bg-slate-50 text-xs">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="font-bold text-[var(--primary)]">{w.category}</span>
-                      <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded">{w.status}</span>
-                    </div>
-                    <p className="text-[var(--muted-foreground)] leading-relaxed">{w.description}</p>
-                    <p className="text-[10px] text-[var(--muted-foreground)] mt-1">{new Date(w.createdAt).toLocaleString()}</p>
-                  </div>
-                ))}
-                {(selectedMemberDetail.welfareRequests || []).length === 0 && (
-                  <p className="text-xs text-[var(--muted-foreground)] py-1">No welfare cases submitted.</p>
-                )}
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-2 border-t border-[var(--border)]">
-              <button onClick={() => setSelectedMemberDetail(null)} className="px-5 py-2 bg-[var(--primary)] text-white rounded text-xs font-semibold">Close Profile</button>
-            </div>
           </div>
         </div>
       )}
