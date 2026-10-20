@@ -1527,7 +1527,15 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                   <div key={l.id} className="p-4 flex items-center justify-between gap-4 text-xs">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-lg overflow-hidden border border-[var(--border)] bg-[var(--muted)] flex-shrink-0">
-                        <img src={l.photo?.secureUrl || "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=200&h=200&fit=crop&auto=format"} alt={l.name} className="w-full h-full object-cover" />
+                        <img
+                          src={l.photoUrl || l.memberPhotoUrl || l.photo?.secureUrl || "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg"}
+                          alt={l.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src = "https://static.vecteezy.com/system/resources/previews/055/582/028/non_2x/gray-circle-user-icon-profile-avatar-simple-symbol-vector.jpg";
+                          }}
+                        />
                       </div>
                       <div>
                         <p className="font-semibold text-sm text-[var(--foreground)]">{l.name}</p>
