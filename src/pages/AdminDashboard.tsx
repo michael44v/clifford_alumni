@@ -188,7 +188,17 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
     setIsLoadingMemberDetail(true);
     try {
       const data = await apiFetch(`/api/admin/members/${id}/details`);
-      setSelectedMemberDetail(data);
+      const memberObj = data?.member ? { ...data.member } : { ...data };
+      const paymentsList = data?.payments || data?.paymentRecords || memberObj.paymentRecords || [];
+      const welfareList = data?.welfareRequests || memberObj.welfareRequests || [];
+      const galleryList = data?.galleryPhotosUploaded || memberObj.galleryPhotosUploaded || [];
+
+      setSelectedMemberDetail({
+        ...memberObj,
+        paymentRecords: paymentsList,
+        welfareRequests: welfareList,
+        galleryPhotosUploaded: galleryList,
+      });
     } catch (err: any) {
       showToast(err.message || "Failed to fetch member details", "error");
     } finally {

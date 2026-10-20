@@ -86,7 +86,30 @@ export async function apiFetch<T = any>(endpoint: string, options: RequestInit =
 export async function uploadToCloudinary(file: File, folder: string = "alumni/uploads"): Promise<{ url: string; publicId: string }> {
   const sigData = await apiFetch(`/api/auth/cloudinary-signature?folder=${encodeURIComponent(folder)}`);
 
-  // 1. Try unsigned upload with upload_preset first
+  // 1. Primary: Signed Upload with API key and signature
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("api_key", sigData.apiKey);
+  formData.append("timestamp", sigData.timestamp.toString());
+  formData.append("signature", sigData.signature);
+  if (sigData.folder) {
+    formData.append("folder", sigData.folder);
+  }
+
+  const cloudinaryRes = await fetch(`https://api.cloudinary.com/v1_1/${sigData.cloudName}/image/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (cloudinaryRes.ok) {
+    const result = await cloudinaryRes.json();
+    return {
+      url: result.secure_url,
+      publicId: result.public_id,
+    };
+  }
+
+  // 2. Secondary: Fallback to unsigned upload if preset allows unsigned
   if (sigData.uploadPreset) {
     const unsignedData = new FormData();
     unsignedData.append("file", file);
@@ -107,27 +130,6 @@ export async function uploadToCloudinary(file: File, folder: string = "alumni/up
     }
   }
 
-  // 2. Fallback to signed upload with API key & signature
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("api_key", sigData.apiKey);
-  formData.append("timestamp", sigData.timestamp.toString());
-  formData.append("signature", sigData.signature);
-  formData.append("folder", sigData.folder);
-
-  const cloudinaryRes = await fetch(`https://api.cloudinary.com/v1_1/${sigData.cloudName}/image/upload`, {
-    method: "POST",
-    body: formData,
-  });
-
-  if (!cloudinaryRes.ok) {
-    const errJson = await cloudinaryRes.json().catch(() => ({}));
-    throw new Error(errJson?.error?.message || "Cloudinary direct upload failed");
-  }
-
-  const result = await cloudinaryRes.json();
-  return {
-    url: result.secure_url,
-    publicId: result.public_id,
-  };
+  const errJson = await cloudinaryRes.json().catch(() => ({}));
+  throw new Error(errJson?.error?.message || "Cloudinary direct upload failed");
 }
