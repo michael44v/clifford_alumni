@@ -39,6 +39,14 @@ export default function Gallery({ onNavigate }: GalleryProps) {
     fetchAlbums();
   }, [activeCategory]);
 
+  useEffect(() => {
+    const targetId = sessionStorage.getItem("targetAlbumId");
+    if (targetId) {
+      sessionStorage.removeItem("targetAlbumId");
+      fetchAlbumDetail(targetId);
+    }
+  }, []);
+
   const fetchAlbumDetail = async (id: string) => {
     try {
       const data = await apiFetch(`/api/gallery/albums/${id}`);
