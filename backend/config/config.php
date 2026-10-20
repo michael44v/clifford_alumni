@@ -44,9 +44,9 @@ if (file_exists($envFile)) {
 
 // Configuration Constants
 define('JWT_SECRET', getenv('JWT_SECRET') ?: 'cuaa_jwt_super_secret_key_2025_change_in_prod');
-define('CLOUDINARY_CLOUD_NAME', getenv('CLOUDINARY_CLOUD_NAME') ?: 'dguvkirdr');
-define('CLOUDINARY_API_KEY', getenv('CLOUDINARY_API_KEY') ?: '172458132431759');
-define('CLOUDINARY_API_SECRET', getenv('CLOUDINARY_API_SECRET') ?: 'T4ZVo8Q0MRc8k22NRLLCpFtSlEQ');
-define('CLOUDINARY_UPLOAD_PRESET', getenv('CLOUDINARY_UPLOAD_PRESET') ?: 'futyApp');
+define('CLOUDINARY_CLOUD_NAME', getenv('CLOUDINARY_CLOUD_NAME') ?: '');
+define('CLOUDINARY_API_KEY', getenv('CLOUDINARY_API_KEY') ?: '');
+define('CLOUDINARY_API_SECRET', getenv('CLOUDINARY_API_SECRET') ?: '');
+define('CLOUDINARY_UPLOAD_PRESET', getenv('CLOUDINARY_UPLOAD_PRESET') ?: '');
 define('KORAPAY_SECRET_KEY', getenv('KORAPAY_SECRET_KEY') ?: 'pk_test_sample');
 define('KORAPAY_PUBLIC_KEY', getenv('KORAPAY_PUBLIC_KEY') ?: 'pk_test_sample');
