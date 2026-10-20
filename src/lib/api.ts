@@ -86,6 +86,28 @@ export async function apiFetch<T = any>(endpoint: string, options: RequestInit =
 export async function uploadToCloudinary(file: File, folder: string = "alumni/uploads"): Promise<{ url: string; publicId: string }> {
   const sigData = await apiFetch(`/api/auth/cloudinary-signature?folder=${encodeURIComponent(folder)}`);
 
+  // 1. Try unsigned upload with upload_preset first
+  if (sigData.uploadPreset) {
+    const unsignedData = new FormData();
+    unsignedData.append("file", file);
+    unsignedData.append("upload_preset", sigData.uploadPreset);
+    if (sigData.folder) unsignedData.append("folder", sigData.folder);
+
+    const unsignedRes = await fetch(`https://api.cloudinary.com/v1_1/${sigData.cloudName}/image/upload`, {
+      method: "POST",
+      body: unsignedData,
+    });
+
+    if (unsignedRes.ok) {
+      const result = await unsignedRes.json();
+      return {
+        url: result.secure_url,
+        publicId: result.public_id,
+      };
+    }
+  }
+
+  // 2. Fallback to signed upload with API key & signature
   const formData = new FormData();
   formData.append("file", file);
   formData.append("api_key", sigData.apiKey);
@@ -99,27 +121,6 @@ export async function uploadToCloudinary(file: File, folder: string = "alumni/up
   });
 
   if (!cloudinaryRes.ok) {
-    // Fallback to unsigned upload if signature fails
-    if (sigData.uploadPreset) {
-      const fallbackData = new FormData();
-      fallbackData.append("file", file);
-      fallbackData.append("upload_preset", sigData.uploadPreset);
-      fallbackData.append("folder", sigData.folder);
-
-      const fallbackRes = await fetch(`https://api.cloudinary.com/v1_1/${sigData.cloudName}/image/upload`, {
-        method: "POST",
-        body: fallbackData,
-      });
-
-      if (fallbackRes.ok) {
-        const result = await fallbackRes.json();
-        return {
-          url: result.secure_url,
-          publicId: result.public_id,
-        };
-      }
-    }
-
     const errJson = await cloudinaryRes.json().catch(() => ({}));
     throw new Error(errJson?.error?.message || "Cloudinary direct upload failed");
   }
