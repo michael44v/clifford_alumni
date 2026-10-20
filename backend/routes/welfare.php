@@ -50,4 +50,11 @@ function handleWelfareRoutes(string $endpoint, string $method): void {
 
         jsonResponse(dbQueryOne("SELECT * FROM welfare_requests WHERE id = ?", [$reqId]));
     }
+
+    if ($method === 'DELETE' && (preg_match('#^/api/welfare/requests/([^/]+)$#', $endpoint, $m) || preg_match('#^/api/welfare/admin/cases/([^/]+)$#', $endpoint, $m))) {
+        requireRole($user, ['ADMIN', 'SUPER_ADMIN', 'WELFARE_ADMIN']);
+        $reqId = $m[1];
+        dbQuery("DELETE FROM welfare_requests WHERE id = ?", [$reqId]);
+        jsonResponse(['message' => 'Welfare request deleted successfully']);
+    }
 }

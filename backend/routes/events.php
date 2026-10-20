@@ -11,10 +11,19 @@ function handleEventRoutes(string $endpoint, string $method): void {
         $qs = $_SERVER['QUERY_STRING'] ?? '';
         $cacheKey = 'events:list' . ($qs ? ':' . $qs : '');
         $data = cacheRemember($cacheKey, 300, function() {
-            return dbQuery("SELECT e.*, m.secureUrl as bannerUrl
+            $rows = dbQuery("SELECT e.*, DATE_FORMAT(e.eventDate, '%Y-%m-%dT%H:%i:%sZ') as eventDateFormatted, m.secureUrl as bannerUrl
                             FROM events e
                             LEFT JOIN media m ON e.bannerMediaId = m.id
                             ORDER BY e.eventDate ASC");
+            return array_map(function($r) {
+                if (!empty($r['eventDateFormatted'])) {
+                    $r['eventDate'] = $r['eventDateFormatted'];
+                } else if (!empty($r['eventDate'])) {
+                    $r['eventDate'] = date('c', strtotime($r['eventDate']));
+                }
+                unset($r['eventDateFormatted']);
+                return $r;
+            }, $rows);
         });
         jsonResponse($data);
     }
@@ -23,10 +32,19 @@ function handleEventRoutes(string $endpoint, string $method): void {
         header('Cache-Control: public, max-age=60, stale-while-revalidate=300');
         $eventIdOrSlug = $m[1];
         $event = cacheRemember("events:item:{$eventIdOrSlug}", 300, function() use ($eventIdOrSlug) {
-            return dbQueryOne("SELECT e.*, m.secureUrl as bannerUrl
+            $r = dbQueryOne("SELECT e.*, DATE_FORMAT(e.eventDate, '%Y-%m-%dT%H:%i:%sZ') as eventDateFormatted, m.secureUrl as bannerUrl
                                FROM events e
                                LEFT JOIN media m ON e.bannerMediaId = m.id
                                WHERE e.id = ? OR e.slug = ?", [$eventIdOrSlug, $eventIdOrSlug]);
+            if ($r) {
+                if (!empty($r['eventDateFormatted'])) {
+                    $r['eventDate'] = $r['eventDateFormatted'];
+                } else if (!empty($r['eventDate'])) {
+                    $r['eventDate'] = date('c', strtotime($r['eventDate']));
+                }
+                unset($r['eventDateFormatted']);
+            }
+            return $r;
         });
         if (!$event) jsonError("Event not found", 404);
         jsonResponse($event);

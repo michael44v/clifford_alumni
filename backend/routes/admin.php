@@ -169,11 +169,29 @@ function handleAdminRoutes(string $endpoint, string $method): void {
                               ORDER BY m.createdAt DESC"));
     }
 
+    if ($method === 'PUT' && preg_match('#^/api/admin/members/([^/]+)$#', $endpoint, $m)) {
+        requireRole($user, ['ADMIN', 'SUPER_ADMIN']);
+        $memberId = $m[1];
+        $body = getRequestBody();
+
+        $existing = dbQueryOne("SELECT * FROM members WHERE id = ?", [$memberId]);
+        if (!$existing) jsonError("Member not found", 404);
+
+        $verificationStatus = $body['verificationStatus'] ?? $existing['verificationStatus'];
+        $role = $body['role'] ?? $existing['role'];
+        $isFeatured = isset($body['isFeatured']) ? ($body['isFeatured'] ? 1 : 0) : $existing['isFeatured'];
+
+        dbQuery("UPDATE members SET verificationStatus = ?, role = ?, isFeatured = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?",
+            [$verificationStatus, $role, $isFeatured, $memberId]);
+
+        jsonResponse(dbQueryOne("SELECT m.*, g.setName, f.name as facultyName FROM members m LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id LEFT JOIN faculties f ON m.facultyId = f.id WHERE m.id = ?", [$memberId]));
+    }
+
     if ($method === 'GET' && preg_match('#^/api/admin/members/([^/]+)/details$#', $endpoint, $m)) {
         requireRole($user, ['ADMIN', 'SUPER_ADMIN']);
         $memberId = $m[1];
 
-        $memberInfo = dbQueryOne("SELECT m.*, g.setName, f.name as facultyName
+        $memberInfo = dbQueryOne("SELECT m.*, g.setName, g.graduationYear, f.name as facultyName
                                 FROM members m
                                 LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id
                                 LEFT JOIN faculties f ON m.facultyId = f.id
@@ -182,12 +200,20 @@ function handleAdminRoutes(string $endpoint, string $method): void {
 
         $payments = dbQuery("SELECT p.*, d.title as duesTitle FROM payment_records p LEFT JOIN dues_items d ON p.duesItemId = d.id WHERE p.memberId = ? ORDER BY p.createdAt DESC", [$memberId]);
         $welfare = dbQuery("SELECT * FROM welfare_requests WHERE memberId = ? ORDER BY createdAt DESC", [$memberId]);
+        $galleryPhotos = dbQuery("SELECT gp.*, a.title as albumTitle FROM gallery_photos gp LEFT JOIN gallery_albums a ON gp.albumId = a.id WHERE gp.uploadedById = ? ORDER BY gp.createdAt DESC", [$memberId]);
 
-        jsonResponse([
-            'member' => $memberInfo,
-            'payments' => $payments,
-            'welfareRequests' => $welfare
-        ]);
+        $memberInfo['graduatingSet'] = [
+            'setName' => $memberInfo['setName'] ?? null,
+            'graduationYear' => $memberInfo['graduationYear'] ?? null
+        ];
+        $memberInfo['faculty'] = [
+            'name' => $memberInfo['facultyName'] ?? null
+        ];
+        $memberInfo['paymentRecords'] = $payments;
+        $memberInfo['welfareRequests'] = $welfare;
+        $memberInfo['galleryPhotosUploaded'] = $galleryPhotos;
+
+        jsonResponse($memberInfo);
     }
 
     if ($method === 'PUT' && preg_match('#^/api/admin/members/([^/]+)/verify$#', $endpoint, $m)) {
