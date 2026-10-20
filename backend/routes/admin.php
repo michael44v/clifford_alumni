@@ -213,7 +213,13 @@ function handleAdminRoutes(string $endpoint, string $method): void {
         $memberInfo['welfareRequests'] = $welfare;
         $memberInfo['galleryPhotosUploaded'] = $galleryPhotos;
 
-        jsonResponse($memberInfo);
+        jsonResponse(array_merge($memberInfo, [
+            'member' => $memberInfo,
+            'payments' => $payments,
+            'paymentRecords' => $payments,
+            'welfareRequests' => $welfare,
+            'galleryPhotosUploaded' => $galleryPhotos,
+        ]));
     }
 
     if ($method === 'PUT' && preg_match('#^/api/admin/members/([^/]+)/verify$#', $endpoint, $m)) {
