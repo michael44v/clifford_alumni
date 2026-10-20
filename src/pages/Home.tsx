@@ -423,8 +423,18 @@ export default function Home({ onNavigate, isLoggedIn }: HomeProps) {
             ) : showcasePhotos.length > 0 ? (
               showcasePhotos.slice(0, 6).map((item, i) => {
                 const imgUrl = item.photoUrl || item.media?.secureUrl;
+                const albumIdToOpen = item.albumId || item.album?.id;
                 return (
-                  <div key={item.id || i} onClick={() => onNavigate("gallery")} className="group relative aspect-square overflow-hidden rounded-lg bg-[var(--muted)] cursor-pointer border border-[var(--border)] shadow-sm">
+                  <div
+                    key={item.id || i}
+                    onClick={() => {
+                      if (albumIdToOpen) {
+                        sessionStorage.setItem("targetAlbumId", albumIdToOpen);
+                      }
+                      onNavigate("gallery");
+                    }}
+                    className="group relative aspect-square overflow-hidden rounded-lg bg-[var(--muted)] cursor-pointer border border-[var(--border)] shadow-sm"
+                  >
                     {imgUrl ? (
                       <img src={imgUrl} alt={item.caption || `Gallery photo ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                     ) : (

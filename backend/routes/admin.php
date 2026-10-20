@@ -161,12 +161,45 @@ function handleAdminRoutes(string $endpoint, string $method): void {
     // MEMBERS ADMIN MANAGEMENT
     if ($method === 'GET' && $endpoint === '/api/admin/members') {
         requireRole($user, ['ADMIN', 'SUPER_ADMIN']);
-        jsonResponse(dbQuery("SELECT m.*, g.setName, f.name as facultyName
-                              FROM members m
-                              LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id
-                              LEFT JOIN faculties f ON m.facultyId = f.id
-                              WHERE m.role NOT IN ('ADMIN', 'SUPER_ADMIN')
-                              ORDER BY m.createdAt DESC"));
+        $search = trim($_GET['search'] ?? '');
+        $status = trim($_GET['status'] ?? '');
+        $facultyId = trim($_GET['facultyId'] ?? '');
+        $setId = trim($_GET['setId'] ?? '');
+
+        $sql = "SELECT m.*, g.setName, f.name as facultyName
+                FROM members m
+                LEFT JOIN graduating_sets g ON m.graduatingSetId = g.id
+                LEFT JOIN faculties f ON m.facultyId = f.id
+                WHERE m.role NOT IN ('ADMIN', 'SUPER_ADMIN')";
+        $params = [];
+
+        if ($search !== '') {
+            $sql .= " AND (m.firstName LIKE ? OR m.lastName LIKE ? OR m.email LIKE ? OR m.matricNumber LIKE ?)";
+            $sParam = "%{$search}%";
+            $params[] = $sParam;
+            $params[] = $sParam;
+            $params[] = $sParam;
+            $params[] = $sParam;
+        }
+
+        if ($status !== '') {
+            $sql .= " AND m.verificationStatus = ?";
+            $params[] = $status;
+        }
+
+        if ($facultyId !== '') {
+            $sql .= " AND m.facultyId = ?";
+            $params[] = $facultyId;
+        }
+
+        if ($setId !== '') {
+            $sql .= " AND m.graduatingSetId = ?";
+            $params[] = $setId;
+        }
+
+        $sql .= " ORDER BY m.createdAt DESC";
+
+        jsonResponse(dbQuery($sql, $params));
     }
 
     if ($method === 'PUT' && preg_match('#^/api/admin/members/([^/]+)$#', $endpoint, $m)) {
