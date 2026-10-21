@@ -17,14 +17,24 @@ function handleGalleryRoutes(string $endpoint, string $method): void {
         jsonResponse($data);
     }
 
-    if ($method === 'GET' && $endpoint === '/api/gallery/albums') {
-        jsonResponse(dbQuery("SELECT a.*, g.setName,
-                              (SELECT m.secureUrl FROM gallery_photos gp JOIN media m ON gp.mediaId = m.id WHERE gp.albumId = a.id ORDER BY gp.createdAt ASC LIMIT 1) as coverUrl,
-                              (SELECT COUNT(*) FROM gallery_photos gp WHERE gp.albumId = a.id) as photoCount
-                              FROM gallery_albums a
-                              LEFT JOIN graduating_sets g ON a.graduatingSetId = g.id
-                              ORDER BY a.createdAt DESC"));
+   if ($method === 'GET' && $endpoint === '/api/gallery/albums') {
+    $category = trim($_GET['category'] ?? '');
+
+    $sql = "SELECT a.*, g.setName,
+            (SELECT m.secureUrl FROM gallery_photos gp JOIN media m ON gp.mediaId = m.id WHERE gp.albumId = a.id ORDER BY gp.createdAt ASC LIMIT 1) as coverUrl,
+            (SELECT COUNT(*) FROM gallery_photos gp WHERE gp.albumId = a.id) as photoCount
+            FROM gallery_albums a
+            LEFT JOIN graduating_sets g ON a.graduatingSetId = g.id";
+    $params = [];
+
+    if ($category !== '' && strtolower($category) !== 'all') {
+        $sql .= " WHERE a.category = ?";
+        $params[] = $category;
     }
+
+    $sql .= " ORDER BY a.createdAt DESC";
+    jsonResponse(dbQuery($sql, $params));
+}
 
     if ($method === 'GET' && $endpoint === '/api/gallery/photos') {
         $albumId = $_GET['albumId'] ?? null;
@@ -41,6 +51,26 @@ function handleGalleryRoutes(string $endpoint, string $method): void {
         jsonResponse(dbQuery($sql, $params));
     }
 
+
+    if ($method === 'GET' && preg_match('#^/api/gallery/albums/([^/]+)$#', $endpoint, $m)) {
+    $albumId = $m[1];
+
+    $album = dbQueryOne("SELECT a.*, g.setName,
+                         (SELECT COUNT(*) FROM gallery_photos gp WHERE gp.albumId = a.id) as photoCount
+                         FROM gallery_albums a
+                         LEFT JOIN graduating_sets g ON a.graduatingSetId = g.id
+                         WHERE a.id = ?", [$albumId]);
+    if (!$album) jsonError("Album not found", 404);
+
+    $album['photos'] = dbQuery("SELECT p.*, m.secureUrl as photoUrl, mem.firstName, mem.lastName
+                                FROM gallery_photos p
+                                JOIN media m ON p.mediaId = m.id
+                                LEFT JOIN members mem ON p.uploadedById = mem.id
+                                WHERE p.albumId = ?
+                                ORDER BY p.createdAt DESC", [$albumId]);
+
+    jsonResponse($album);
+}
     // Protected Gallery Routes
     $user = authenticateJWT();
 

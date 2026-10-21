@@ -6,13 +6,19 @@ import { GridSkeleton } from "../components/Skeleton";
 type Page = "home" | "about" | "directory" | "events" | "news" | "career" | "business" | "welfare" | "leadership" | "gallery" | "finance" | "donate" | "contact" | "login" | "register" | "dashboard" | "admin";
 interface GalleryProps { onNavigate: (page: Page) => void; }
 
-const categories = ["All", "AGM", "REUNION", "EVENTS", "GRADUATION", "WELFARE", "NETWORKING", "HISTORICAL", "CLASS_PHOTOS"];
+const categories = ["All", "AGM", "REUNION", "ALUMNI_EVENT", "GRADUATING_SET", "INDIVIDUAL_ALUMNI", "UNIVERSITY_MEMORIES", "HISTORICAL_ARCHIVE", "OTHER"];
+const FALLBACK_COVER = "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=400&fit=crop&auto=format";
+
+// Works with different backend photo shapes
+const getPhotoSrc = (p: any): string =>
+  p?.photoUrl || p?.url || p?.media?.secureUrl || p?.media?.url || "";
 
 export default function Gallery({ onNavigate }: GalleryProps) {
   const [activeCategory, setActiveCategory] = useState("All");
   const [albums, setAlbums] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedAlbum, setSelectedAlbum] = useState<any | null>(null);
+  const [loadingAlbum, setLoadingAlbum] = useState(false);
   const [viewingPhoto, setViewingPhoto] = useState<any | null>(null);
 
   // Upload modal state
@@ -47,12 +53,39 @@ export default function Gallery({ onNavigate }: GalleryProps) {
     }
   }, []);
 
+  // Load a full album (with its photos) by id
   const fetchAlbumDetail = async (id: string) => {
     try {
-      const data = await apiFetch(`/api/gallery/albums/${id}`);
-      setSelectedAlbum(data);
+      setLoadingAlbum(true);
+      const res = await apiFetch(`/api/gallery/albums/${id}`);
+      const detail = res?.data ?? res;
+      setSelectedAlbum({ ...detail, photos: detail?.photos ?? detail?.images ?? [] });
     } catch (err) {
       console.error("Failed to load album details:", err);
+      showToast("Failed to load album photos", "error");
+    } finally {
+      setLoadingAlbum(false);
+    }
+  };
+
+  // Open the modal instantly with list data, then fill in the full photo list
+  const openAlbum = async (album: any) => {
+    setSelectedAlbum({ ...album, photos: album.photos ?? [] });
+    if (!album.id) return;
+    try {
+      setLoadingAlbum(true);
+      const res = await apiFetch(`/api/gallery/albums/${album.id}`);
+      const detail = res?.data ?? res;
+      setSelectedAlbum({
+        ...album,
+        ...detail,
+        photos: detail?.photos ?? detail?.images ?? album.photos ?? [],
+      });
+    } catch (err) {
+      console.error("Failed to load album details:", err);
+      showToast("Failed to load album photos", "error");
+    } finally {
+      setLoadingAlbum(false);
     }
   };
 
@@ -61,7 +94,7 @@ export default function Gallery({ onNavigate }: GalleryProps) {
     try {
       await apiFetch(`/api/gallery/photos/${photoId}`, { method: "DELETE" });
       showToast("Photo deleted", "success");
-      if (selectedAlbum) {
+      if (selectedAlbum?.id) {
         fetchAlbumDetail(selectedAlbum.id);
       }
       fetchAlbums();
@@ -152,7 +185,9 @@ export default function Gallery({ onNavigate }: GalleryProps) {
       showToast(`Successfully uploaded ${validPhotos.length} photo(s) to gallery showcase!`, "success");
       setShowUploadModal(false);
       setUploadAlbumTitle("");
+      setSelectedAlbumId("");
       setImageUrls([""]);
+      setImageFiles([null]);
       setCaptions([""]);
       fetchAlbums();
     } catch (err: any) {
@@ -163,6 +198,7 @@ export default function Gallery({ onNavigate }: GalleryProps) {
   };
 
   const filtered = albums;
+  const albumPhotos: any[] = selectedAlbum?.photos || [];
 
   return (
     <div className="bg-[var(--background)]">
@@ -204,11 +240,15 @@ export default function Gallery({ onNavigate }: GalleryProps) {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {filtered.map((album) => {
-              const coverImg = album.coverUrl || album.photos?.[0]?.media?.secureUrl || album.photos?.[0]?.media?.url || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=400&fit=crop&auto=format";
+              const coverImg = album.coverUrl || getPhotoSrc(album.photos?.[0]) || FALLBACK_COVER;
               const photoCount = album.photoCount || album._count?.photos || album.photos?.length || 0;
 
               return (
-                <div key={album.id || album.title} onClick={() => fetchAlbumDetail(album.id)} className="bg-white border border-[var(--border)] rounded overflow-hidden hover:shadow-md transition-shadow cursor-pointer group">
+                <div
+                  key={album.id || album.title}
+                  onClick={() => openAlbum(album)}
+                  className="bg-white border border-[var(--border)] rounded overflow-hidden hover:shadow-md transition-shadow cursor-pointer group"
+                >
                   <div className="h-48 bg-[var(--muted)] overflow-hidden relative">
                     <img src={coverImg} alt={album.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
@@ -254,16 +294,19 @@ export default function Gallery({ onNavigate }: GalleryProps) {
               <div>
                 <span className="px-2 py-0.5 bg-[var(--muted)] text-[var(--primary)] text-[10px] font-bold rounded uppercase">{selectedAlbum.category}</span>
                 <h2 className="font-display text-2xl font-bold text-[var(--secondary)] mt-1">{selectedAlbum.title}</h2>
-                <p className="text-xs text-[var(--muted-foreground)]">{selectedAlbum.description || "Album Photos Showcase"}</p>
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  {selectedAlbum.description || "Album Photos Showcase"}
+                  {albumPhotos.length > 0 && ` · ${albumPhotos.length} photo${albumPhotos.length === 1 ? "" : "s"}`}
+                </p>
               </div>
               <button onClick={() => setSelectedAlbum(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl">✕</button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 py-2">
-              {(selectedAlbum.photos || []).map((p: any) => {
-                const photoSrc = p.photoUrl || p.media?.secureUrl;
+              {albumPhotos.map((p: any) => {
+                const photoSrc = getPhotoSrc(p);
                 return (
-                  <div key={p.id} className="bg-slate-50 border border-[var(--border)] rounded-lg overflow-hidden flex flex-col group cursor-pointer hover:border-[var(--primary)] transition-all">
+                  <div key={p.id || photoSrc} className="bg-slate-50 border border-[var(--border)] rounded-lg overflow-hidden flex flex-col group cursor-pointer hover:border-[var(--primary)] transition-all">
                     <div className="h-48 bg-[var(--muted)] overflow-hidden relative" onClick={() => setViewingPhoto(p)}>
                       <img src={photoSrc} alt={p.caption || "Gallery photo"} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
@@ -280,7 +323,11 @@ export default function Gallery({ onNavigate }: GalleryProps) {
                   </div>
                 );
               })}
-              {(selectedAlbum.photos || []).length === 0 && (
+
+              {loadingAlbum && albumPhotos.length === 0 && (
+                <p className="col-span-full text-center py-8 text-xs text-[var(--muted-foreground)]">Loading photos...</p>
+              )}
+              {!loadingAlbum && albumPhotos.length === 0 && (
                 <p className="col-span-full text-center py-8 text-xs text-[var(--muted-foreground)]">No photos uploaded to this album yet.</p>
               )}
             </div>
@@ -294,10 +341,10 @@ export default function Gallery({ onNavigate }: GalleryProps) {
 
       {/* Photo Lightbox Modal */}
       {viewingPhoto && (
-        <div className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center p-4" onClick={() => setViewingPhoto(null)}>
+        <div className="fixed inset-0 bg-black/90 z-[60] flex flex-col items-center justify-center p-4" onClick={() => setViewingPhoto(null)}>
           <div className="relative max-w-5xl w-full flex flex-col items-center" onClick={e => e.stopPropagation()}>
             <button onClick={() => setViewingPhoto(null)} className="absolute -top-10 right-0 text-white font-bold text-2xl hover:text-gray-300">✕ Close</button>
-            <img src={viewingPhoto.photoUrl || viewingPhoto.media?.secureUrl} alt={viewingPhoto.caption || "Full size photo"} className="max-h-[80vh] w-auto max-w-full rounded-lg shadow-2xl object-contain" />
+            <img src={getPhotoSrc(viewingPhoto)} alt={viewingPhoto.caption || "Full size photo"} className="max-h-[80vh] w-auto max-w-full rounded-lg shadow-2xl object-contain" />
             {viewingPhoto.caption && (
               <p className="mt-3 text-white text-sm bg-black/60 px-4 py-2 rounded max-w-xl text-center">{viewingPhoto.caption}</p>
             )}

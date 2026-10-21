@@ -87,6 +87,8 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
   const [duesForm, setDuesForm] = useState({ title: "", amount: "", type: "ANNUAL_DUES", academicYear: "2024/2025", description: "" });
   const [campaignForm, setCampaignForm] = useState({ title: "", description: "", targetAmount: "" });
 
+  const [viewPhoto, setViewPhoto] = useState<any | null>(null);
+
   const fetchData = async (silent: boolean = false) => {
     if (!silent) setLoading(true);
     try {
@@ -136,6 +138,12 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
       if (!silent) setLoading(false);
     }
   };
+
+  useEffect(() => {
+  const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setViewPhoto(null); };
+  window.addEventListener("keydown", onKey);
+  return () => window.removeEventListener("keydown", onKey);
+}, []);
 
   useEffect(() => {
     // Silent update when filters/search change to prevent full screen refresh flashing
@@ -1139,7 +1147,12 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
                 .map((photo) => (
                 <div key={photo.id} className="border border-[var(--border)] rounded-lg overflow-hidden bg-slate-50 flex flex-col hover:shadow-md transition-shadow">
                   <div className="h-44 bg-[var(--muted)] relative overflow-hidden">
-                    <img src={photo.photoUrl || photo.media?.secureUrl || photo.media?.url} alt={photo.caption || "Showcase photo"} className="w-full h-full object-cover" />
+                    <img
+  src={photo.photoUrl || photo.media?.secureUrl || photo.media?.url}
+  alt={photo.caption || "Showcase photo"}
+  onClick={() => setViewPhoto(photo)}
+  className="w-full h-full object-cover cursor-zoom-in hover:scale-105 transition-transform duration-300"
+/>
                     {photo.isFeatured && (
                       <span className="absolute top-2 right-2 px-2 py-0.5 bg-amber-500 text-white font-bold text-[10px] rounded shadow uppercase tracking-wide">
                         🌟 Featured
@@ -1583,6 +1596,43 @@ export default function AdminDashboard({ onNavigate, onLogout }: AdminDashboardP
           </div>
         )}
       </div>
+
+
+{/* Photo Viewer */}
+{viewPhoto && (
+  <div
+    className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4"
+    onClick={() => setViewPhoto(null)}
+  >
+    <button
+      onClick={() => setViewPhoto(null)}
+      className="absolute top-4 right-5 text-white text-3xl font-bold hover:text-gray-300"
+      aria-label="Close"
+    >
+      ✕
+    </button>
+    <div className="max-w-5xl w-full flex flex-col items-center" onClick={e => e.stopPropagation()}>
+      <img
+        src={viewPhoto.photoUrl || viewPhoto.media?.secureUrl || viewPhoto.media?.url}
+        alt={viewPhoto.caption || "Photo"}
+        className="max-h-[80vh] max-w-full object-contain rounded shadow-2xl"
+      />
+      {(viewPhoto.caption || viewPhoto.albumTitle || viewPhoto.album?.title) && (
+        <p className="text-white/90 text-sm mt-3 text-center">
+          {viewPhoto.caption || viewPhoto.albumTitle || viewPhoto.album?.title}
+        </p>
+      )}
+      <a
+        href={viewPhoto.photoUrl || viewPhoto.media?.secureUrl || viewPhoto.media?.url}
+        target="_blank"
+        rel="noreferrer"
+        className="text-xs text-white/70 underline mt-1"
+      >
+        Open original in new tab
+      </a>
+    </div>
+  </div>
+)}
 
       {/* Admin Replace Photo Modal */}
       {showReplaceModal && (
