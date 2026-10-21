@@ -137,21 +137,21 @@ export default function Leadership({ onNavigate }: LeadershipProps) {
               <div className="bg-white border border-[var(--border)] rounded overflow-hidden mb-10">
                 <div className="grid grid-cols-1 md:grid-cols-3">
                   <div
-                    className="h-64 md:h-auto bg-slate-100 flex items-center justify-center overflow-hidden cursor-pointer"
+                    className="aspect-square w-full md:self-start bg-slate-100 flex items-center justify-center overflow-hidden cursor-pointer"
                     onClick={() => setSelectedMember(president)}
                   >
                     {getPhoto(president) ? (
                       <img
                         src={getPhoto(president)}
                         alt={president.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover object-top"
                         onError={(e) => {
                           e.currentTarget.onerror = null;
                           e.currentTarget.src = DEFAULT_AVATAR;
                         }}
                       />
                     ) : (
-                      <div className="w-full h-full min-h-[200px] flex items-center justify-center bg-slate-200 text-slate-400 font-bold text-3xl">
+                      <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-400 font-bold text-3xl">
                         {getInitials(president.name)}
                       </div>
                     )}
@@ -193,12 +193,12 @@ export default function Leadership({ onNavigate }: LeadershipProps) {
                       onClick={() => setSelectedMember(member)}
                       className="bg-white border border-[var(--border)] rounded overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
                     >
-                      <div className="h-48 bg-slate-100 flex items-center justify-center overflow-hidden">
+                      <div className="aspect-square w-full bg-slate-100 flex items-center justify-center overflow-hidden">
                         {getPhoto(member) ? (
                           <img
                             src={getPhoto(member)}
                             alt={member.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover object-top"
                             onError={(e) => {
                               e.currentTarget.onerror = null;
                               e.currentTarget.src = DEFAULT_AVATAR;
@@ -268,7 +268,7 @@ export default function Leadership({ onNavigate }: LeadershipProps) {
                     <img
                       src={getPhoto(selectedMember)}
                       alt={selectedMember.name}
-                      className="w-28 h-28 sm:w-32 sm:h-32 rounded-xl object-cover border-4 border-white shadow-md bg-[var(--muted)]"
+                      className="w-28 h-28 sm:w-32 sm:h-32 rounded-xl object-cover object-top border-4 border-white shadow-md bg-[var(--muted)]"
                       onError={(e) => {
                         e.currentTarget.onerror = null;
                         e.currentTarget.src = DEFAULT_AVATAR;
